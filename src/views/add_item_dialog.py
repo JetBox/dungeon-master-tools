@@ -4,11 +4,13 @@ from PyQt6.QtWidgets import (
     QLineEdit,
     QPushButton,
     QSpinBox,
+    QButtonGroup,
+    QRadioButton,
     QHBoxLayout,
     QVBoxLayout,
 )
 
-from src.models import RoundTrackerItem
+from src.models import RoundTrackerItem, ItemCategory, CATEGORY_STYLE
 
 
 class AddItemDialog(QDialog):
@@ -29,6 +31,19 @@ class AddItemDialog(QDialog):
         self._rounds_spin.setMinimum(1)
         layout.addWidget(self._rounds_spin)
 
+        layout.addWidget(QLabel("Type:"))
+        self._category_group = QButtonGroup(self)
+        self._radio_map: dict[QRadioButton, ItemCategory] = {}
+        for cat in ItemCategory:
+            _, emoji = CATEGORY_STYLE[cat]
+            label = f"{emoji} {cat.value}".strip()
+            radio = QRadioButton(label)
+            self._category_group.addButton(radio)
+            self._radio_map[radio] = cat
+            layout.addWidget(radio)
+            if cat == ItemCategory.OTHER:
+                radio.setChecked(True)
+
         self._error_label = QLabel("")
         self._error_label.setStyleSheet("color: red;")
         self._error_label.hide()
@@ -43,8 +58,13 @@ class AddItemDialog(QDialog):
         button_layout.addWidget(cancel_button)
         layout.addLayout(button_layout)
 
+    def _selected_category(self) -> ItemCategory:
+        for radio, cat in self._radio_map.items():
+            if radio.isChecked():
+                return cat
+        return ItemCategory.OTHER
+
     def _on_add(self) -> None:
-        """Validate fields; show inline error or accept."""
         if not self._name_edit.text().strip():
             self._error_label.setText("Name cannot be empty.")
             self._error_label.show()
@@ -61,4 +81,5 @@ class AddItemDialog(QDialog):
         return RoundTrackerItem(
             name=self._name_edit.text().strip(),
             rounds=self._rounds_spin.value(),
+            category=self._selected_category(),
         )

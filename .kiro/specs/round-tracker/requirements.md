@@ -83,3 +83,74 @@ The Round Tracker is a new tab in the TTRPG DM Tool application for tracking tim
 
 1. WHEN the user navigates away from the Round_Tracker tab and then returns to it, THE Round_Tracker SHALL display all Item_Widgets that were present before the tab switch.
 2. WHEN the user navigates away from the Round_Tracker tab and then returns to it, THE Round_Tracker SHALL display each Item_Widget with the same name and round count it had before the tab switch.
+
+---
+
+### Requirement 7: Inline Name Editing
+
+**User Story:** As a DM, I want to edit an item's name directly in the widget, so that I can rename tracked items without recreating them.
+
+#### Acceptance Criteria
+
+1. THE Item_Widget SHALL display the Round_Tracker_Item's name in an editable text field.
+2. WHEN the user edits the name field in an Item_Widget, THE Item_Widget SHALL update the displayed name to reflect the new value.
+3. IF the user clears the name field in an Item_Widget, THEN THE Item_Widget SHALL retain the previous name value.
+
+---
+
+### Requirement 8: Inline Round Count Editing
+
+**User Story:** As a DM, I want to edit an item's round count directly in the widget, so that I can adjust values without recreating items.
+
+#### Acceptance Criteria
+
+1. THE Item_Widget SHALL display the Round_Tracker_Item's round count in an editable numeric field.
+2. WHEN the user edits the round count field in an Item_Widget, THE Item_Widget SHALL update the displayed value to reflect the new input.
+3. IF the user enters a value less than zero in the round count field, THEN THE Item_Widget SHALL set the round count to zero.
+4. IF the user enters a non-numeric value in the round count field, THEN THE Item_Widget SHALL retain the previous round count value.
+
+---
+
+### Requirement 9: Decrement Button
+
+**User Story:** As a DM, I want a '-' button to the left of the round count, so that I can quickly decrement the value by one.
+
+#### Acceptance Criteria
+
+1. THE Item_Widget SHALL display a circular '-' button to the left of the round count field.
+2. WHEN the user clicks the '-' button, THE Item_Widget SHALL decrement the round count by one.
+3. WHILE the round count is zero, THE Item_Widget SHALL NOT decrement the round count below zero when the '-' button is clicked.
+
+---
+
+### Requirement 10: Increment Button
+
+**User Story:** As a DM, I want a '+' button to the right of the round count, so that I can quickly increment the value by one.
+
+#### Acceptance Criteria
+
+1. THE Item_Widget SHALL display a circular '+' button to the right of the round count field.
+2. WHEN the user clicks the '+' button, THE Item_Widget SHALL increment the round count by one.
+
+---
+
+### Requirement 11: Delete Widget Button
+
+**User Story:** As a DM, I want an 'X' button on each widget, so that I can remove items I no longer need to track.
+
+#### Acceptance Criteria
+
+1. THE Item_Widget SHALL display an 'X' button in the top-right corner of the widget.
+2. WHEN the user clicks the 'X' button, THE Round_Tracker SHALL remove the corresponding Item_Widget from the item list.
+
+---
+
+### Requirement 12: Sort Button
+
+**User Story:** As a DM, I want a 'Sort' button in the Round Tracker, so that I can automatically order all items from lowest to highest round count.
+
+#### Acceptance Criteria
+
+1. THE Round_Tracker SHALL display a "Sort" button within the tab view, outside of any Item_Widget.
+2. WHEN the user clicks the "Sort" button, THE Round_Tracker SHALL reorder all Item_Widgets in the list from lowest to highest round count.
+3. WHEN the user clicks the "Sort" button and two or more Item_Widgets share the same round count, THE Round_Tracker SHALL preserve their relative order.
