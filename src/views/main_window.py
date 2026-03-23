@@ -1,5 +1,6 @@
 from PyQt6.QtWidgets import QMainWindow, QMenuBar, QMenu, QTabWidget, QWidget
 from PyQt6.QtGui import QAction
+from src.views.round_tracker_tab import RoundTrackerTab
 
 
 class MainWindow(QMainWindow):
@@ -27,6 +28,8 @@ class MainWindow(QMainWindow):
         # Central tab widget
         self._tab_widget = QTabWidget()
         self._tab_widget.addTab(QWidget(), "Campaign Overview")
+        self._round_tracker_tab = RoundTrackerTab()
+        self._tab_widget.addTab(self._round_tracker_tab, "Round Tracker")
         self.setCentralWidget(self._tab_widget)
 
     def set_title(self, project_name: str) -> None:
