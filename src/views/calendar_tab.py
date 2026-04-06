@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QHBoxLayout,
     QGridLayout,
-    QSplitter,
+    QSizePolicy,
 )
 from PyQt6.QtCore import pyqtSignal, Qt
 
@@ -43,11 +43,11 @@ class DayCell(QFrame):
         self._date = date
         self._state = "future"
 
-        self.setFixedSize(52, 52)
+        self.setFixedSize(40, 36)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(4, 4, 4, 4)
+        layout.setContentsMargins(0, 0, 0, 0)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self._label = QLabel(str(date.day))
@@ -77,6 +77,8 @@ class DayCell(QFrame):
 
 class CalendarView(QWidget):
     month_changed = pyqtSignal()
+    # Signal carries delta in seconds (positive = forward, negative = backward)
+    time_adjusted = pyqtSignal(int)
 
     def __init__(self, year: int, month: int, parent=None) -> None:
         super().__init__(parent)
@@ -86,6 +88,50 @@ class CalendarView(QWidget):
 
         root = QVBoxLayout(self)
         root.setContentsMargins(4, 4, 4, 4)
+        root.setSpacing(4)
+
+        # Tracked date banner with time adjustment buttons — spans full width
+        _increments = [
+            (10,    "10s"),
+            (60,    "1m"),
+            (600,   "10m"),
+            (3600,  "1h"),
+            (28800, "8h"),
+            (86400, "1d"),
+        ]
+
+        banner_row = QHBoxLayout()
+        banner_row.setSpacing(2)
+
+        # Left side: largest → smallest (smallest closest to the date label)
+        for seconds, label in reversed(_increments):
+            btn = QPushButton(f"−{label}")
+            btn.setFixedHeight(22)
+            btn.setStyleSheet("font-size: 10px; padding: 0 4px;")
+            btn.clicked.connect(lambda _, s=seconds: self.time_adjusted.emit(-s))
+            banner_row.addWidget(btn)
+
+        self._banner = QLabel()
+        self._banner.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._banner.setStyleSheet("font-weight: bold; font-size: 15px; padding: 0 6px;")
+        banner_row.addWidget(self._banner, stretch=1)
+
+        # Right side: smallest → largest
+        for seconds, label in _increments:
+            btn = QPushButton(f"+{label}")
+            btn.setFixedHeight(22)
+            btn.setStyleSheet("font-size: 10px; padding: 0 4px;")
+            btn.clicked.connect(lambda _, s=seconds: self.time_adjusted.emit(s))
+            banner_row.addWidget(btn)
+
+        root.addLayout(banner_row)
+
+        # Inner container — Fixed size so the grid columns don't stretch
+        self._inner = QWidget()
+        self._inner.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        inner_layout = QVBoxLayout(self._inner)
+        inner_layout.setContentsMargins(0, 0, 0, 0)
+        inner_layout.setSpacing(4)
 
         # Month header
         header_layout = QHBoxLayout()
@@ -103,16 +149,22 @@ class CalendarView(QWidget):
         header_layout.addWidget(self._prev_btn)
         header_layout.addWidget(self._month_label, stretch=1)
         header_layout.addWidget(self._next_btn)
-        root.addLayout(header_layout)
+        inner_layout.addLayout(header_layout)
 
         # Grid container
         self._grid_widget = QWidget()
+        self._grid_widget.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self._grid = QGridLayout(self._grid_widget)
-        self._grid.setSpacing(2)
-        root.addWidget(self._grid_widget)
-        root.addStretch()
+        self._grid.setSpacing(0)
+        self._grid.setContentsMargins(0, 0, 0, 0)
+        inner_layout.addWidget(self._grid_widget)
+
+        root.addWidget(self._inner, alignment=Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
 
         self._rebuild_grid()
+
+    def set_banner_text(self, text: str) -> None:
+        self._banner.setText(text)
 
     # ------------------------------------------------------------------
     # Navigation
@@ -261,32 +313,26 @@ class CalendarTab(QWidget):
 
         root = QVBoxLayout(self)
         root.setContentsMargins(8, 8, 8, 8)
+        root.setSpacing(4)
 
-        # Tracked date banner
-        self._banner = QLabel(self._format_tracked_date())
-        self._banner.setStyleSheet("font-weight: bold; font-size: 15px;")
-        root.addWidget(self._banner)
-
-        # Splitter: CalendarView (left) + DayDetailSidebar (right)
-        splitter = QSplitter(Qt.Orientation.Horizontal)
-
+        # Vertical layout: CalendarView on top, DayDetailSidebar below
         self._calendar_view = CalendarView(
             self._tracked_date.year, self._tracked_date.month
         )
+        self._calendar_view.set_banner_text(self._format_tracked_date())
+
         self._sidebar = DayDetailSidebar()
+        self._sidebar.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
 
-        splitter.addWidget(self._calendar_view)
-        splitter.addWidget(self._sidebar)
-        splitter.setStretchFactor(0, 3)
-        splitter.setStretchFactor(1, 1)
-
-        root.addWidget(splitter)
+        root.addWidget(self._calendar_view, alignment=Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
+        root.addWidget(self._sidebar)
 
         # Connect signals
         for cell in self._calendar_view._cells:
             cell.clicked.connect(self._on_day_clicked)
 
         self._calendar_view.month_changed.connect(self._on_month_changed)
+        self._calendar_view.time_adjusted.connect(self._on_time_adjusted)
         self._sidebar.close_requested.connect(self._on_close_requested)
 
         self._calendar_view.refresh_states(self._tracked_date, self._selected_date)
@@ -302,6 +348,19 @@ class CalendarTab(QWidget):
         else:
             self._selected_date = date
             self._sidebar.show_day(date)
+        self._calendar_view.refresh_states(self._tracked_date, self._selected_date)
+
+    def _on_time_adjusted(self, delta_seconds: int) -> None:
+        self._tracked_date += datetime.timedelta(seconds=delta_seconds)
+        self._calendar_view.set_banner_text(self._format_tracked_date())
+        # If the tracked date moved to a different month, navigate the view there
+        if (self._tracked_date.year != self._calendar_view.year or
+                self._tracked_date.month != self._calendar_view.month):
+            self._calendar_view._year = self._tracked_date.year
+            self._calendar_view._month = self._tracked_date.month
+            self._calendar_view._rebuild_grid()
+            for cell in self._calendar_view._cells:
+                cell.clicked.connect(self._on_day_clicked)
         self._calendar_view.refresh_states(self._tracked_date, self._selected_date)
 
     def _on_close_requested(self) -> None:
