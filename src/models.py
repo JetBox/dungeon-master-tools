@@ -1,3 +1,4 @@
+import datetime
 from dataclasses import dataclass, field
 from enum import Enum
 
@@ -31,3 +32,8 @@ class RoundTrackerItem:
     name: str
     rounds: int
     category: ItemCategory = field(default=ItemCategory.OTHER)
+
+
+@dataclass
+class CalendarDay:
+    date: datetime.date
