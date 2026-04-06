@@ -35,5 +35,12 @@ class RoundTrackerItem:
 
 
 @dataclass
+class TimeTrackerItem:
+    name: str
+    seconds: int          # total duration in seconds, >= 1
+    category: ItemCategory = field(default=ItemCategory.OTHER)
+
+
+@dataclass
 class CalendarDay:
     date: datetime.date
