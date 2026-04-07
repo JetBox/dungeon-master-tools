@@ -35,6 +35,15 @@ class MainWindow(QMainWindow):
         self._tab_widget.addTab(self._calendar_tab, "Calendar")
         self.setCentralWidget(self._tab_widget)
 
+        self._calendar_tab.calendar_selection_cancelled.connect(
+            lambda: self._tab_widget.setCurrentIndex(0)
+        )
+
+    @property
+    def calendar_tab(self) -> CalendarTab:
+        """Return the CalendarTab instance."""
+        return self._calendar_tab
+
     def set_title(self, project_name: str) -> None:
         """Update the window title to reflect the active project name."""
         self.setWindowTitle(project_name)

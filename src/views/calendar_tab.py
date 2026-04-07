@@ -1,5 +1,4 @@
 import datetime
-import calendar
 
 from PyQt6.QtWidgets import (
     QWidget,
@@ -11,16 +10,40 @@ from PyQt6.QtWidgets import (
     QGridLayout,
     QSizePolicy,
 )
-from PyQt6.QtCore import pyqtSignal, Qt
+from PyQt6.QtCore import pyqtSignal, Qt, QTimer
+
+from src.models import CalendarDefinition, FantasyDateTime, GREGORIAN_DEFAULT, Project, Project
+
+
+# ---------------------------------------------------------------------------
+# Simple date-like container for calendar cells
+# ---------------------------------------------------------------------------
+
+class _CalDate:
+    """Lightweight year/month/day container used by DayCell."""
+    __slots__ = ("year", "month", "day")
+
+    def __init__(self, year: int, month: int, day: int) -> None:
+        self.year = year
+        self.month = month
+        self.day = day
+
+    def __eq__(self, other) -> bool:
+        if isinstance(other, _CalDate):
+            return self.year == other.year and self.month == other.month and self.day == other.day
+        return NotImplemented
+
+    def __hash__(self) -> int:
+        return hash((self.year, self.month, self.day))
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _format_date(date: datetime.date) -> str:
-    """Format a date as 'Monday, June 9, 2025' (no zero-padded day, cross-platform)."""
-    return date.strftime("%A, %B") + f" {date.day}, " + date.strftime("%Y")
+def _format_date(date) -> str:
+    """Format a _CalDate as 'Day N, Month Name, Year'."""
+    return f"Day {date.day}, Month {date.month}, {date.year}"
 
 
 # ---------------------------------------------------------------------------
@@ -36,9 +59,9 @@ _STATE_STYLES = {
 
 
 class DayCell(QFrame):
-    clicked = pyqtSignal(object)  # carries datetime.date
+    clicked = pyqtSignal(object)  # carries _CalDate
 
-    def __init__(self, date: datetime.date, parent=None) -> None:
+    def __init__(self, date: _CalDate, parent=None) -> None:
         super().__init__(parent)
         self._date = date
         self._state = "future"
@@ -57,7 +80,7 @@ class DayCell(QFrame):
         self.set_state("future")
 
     @property
-    def date(self) -> datetime.date:
+    def date(self) -> _CalDate:
         return self._date
 
     def set_state(self, state: str) -> None:
@@ -80,8 +103,9 @@ class CalendarView(QWidget):
     # Signal carries delta in seconds (positive = forward, negative = backward)
     time_adjusted = pyqtSignal(int)
 
-    def __init__(self, year: int, month: int, parent=None) -> None:
+    def __init__(self, calendar_def: CalendarDefinition, year: int, month: int, parent=None) -> None:
         super().__init__(parent)
+        self._calendar_def = calendar_def
         self._year = year
         self._month = month
         self._cells: list[DayCell] = []
@@ -172,7 +196,7 @@ class CalendarView(QWidget):
 
     def _go_prev_month(self) -> None:
         if self._month == 1:
-            self._month = 12
+            self._month = len(self._calendar_def.months)
             self._year -= 1
         else:
             self._month -= 1
@@ -180,7 +204,7 @@ class CalendarView(QWidget):
         self.month_changed.emit()
 
     def _go_next_month(self) -> None:
-        if self._month == 12:
+        if self._month == len(self._calendar_def.months):
             self._month = 1
             self._year += 1
         else:
@@ -193,53 +217,66 @@ class CalendarView(QWidget):
     # ------------------------------------------------------------------
 
     def _rebuild_grid(self) -> None:
-        # Clear existing grid items
+        # Clear existing grid items — hide before reparenting to avoid Qt flashing them as top-level windows
         while self._grid.count():
             item = self._grid.takeAt(0)
             w = item.widget()
             if w:
+                w.hide()
                 w.setParent(None)
                 w.deleteLater()
         self._cells.clear()
 
-        # Update month label
-        month_name = datetime.date(self._year, self._month, 1).strftime("%B %Y")
-        self._month_label.setText(month_name)
+        # Task 4.5: Update month label using CalendarDefinition month name
+        month_def = self._calendar_def.months[self._month - 1]
+        self._month_label.setText(month_def.name + " " + str(self._year))
 
-        # Weekday headers (Sunday=0 … Saturday=6)
-        day_names = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
-        for col, name in enumerate(day_names):
-            lbl = QLabel(name)
+        # Task 4.4: Weekday headers from CalendarDefinition (abbreviated to 3 chars)
+        week_length = self._calendar_def.week_length
+        for col, name in enumerate(self._calendar_def.weekday_names):
+            lbl = QLabel(name[:3])
             lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
             lbl.setStyleSheet("font-weight: bold; color: palette(text);")
             self._grid.addWidget(lbl, 0, col)
 
-        # calendar.monthcalendar returns weeks as lists of 7 ints (Mon=0…Sun=6), 0 = no day
-        # We need Sunday-first ordering, so we use calendar.Calendar(firstweekday=6)
-        cal = calendar.Calendar(firstweekday=6)
-        weeks = cal.monthdayscalendar(self._year, self._month)
+        # Task 4.3: Compute starting column using FantasyDateTime.day_of_week for day 1
+        first_day = FantasyDateTime(
+            calendar=self._calendar_def,
+            year=self._year,
+            month=self._month,
+            day=1,
+            hour=0,
+            minute=0,
+            second=0,
+        )
+        start_col = first_day.day_of_week()
 
-        for row_idx, week in enumerate(weeks):
-            for col_idx, day_num in enumerate(week):
-                if day_num == 0:
-                    continue
-                date = datetime.date(self._year, self._month, day_num)
-                cell = DayCell(date)
-                self._cells.append(cell)
-                self._grid.addWidget(cell, row_idx + 1, col_idx)
+        # Place day cells from day 1 to day_count
+        day_count = month_def.effective_day_count(self._year)
+        for day_num in range(1, day_count + 1):
+            col = (start_col + day_num - 1) % week_length
+            row = (start_col + day_num - 1) // week_length + 1
+            date = _CalDate(self._year, self._month, day_num)
+            cell = DayCell(date)
+            self._cells.append(cell)
+            self._grid.addWidget(cell, row, col)
+
+    def set_calendar(self, cal: CalendarDefinition) -> None:
+        self._calendar_def = cal
+        self._rebuild_grid()
 
     # ------------------------------------------------------------------
     # State refresh
     # ------------------------------------------------------------------
 
-    def refresh_states(self, tracked_date: datetime.datetime, selected_date) -> None:
-        today = tracked_date.date()
+    def refresh_states(self, tracked_date: FantasyDateTime, selected_date) -> None:
         for cell in self._cells:
-            if selected_date is not None and cell.date == selected_date:
+            cd = cell.date
+            if selected_date is not None and cd == selected_date:
                 cell.set_state("selected")
-            elif cell.date == today:
+            elif cd.year == tracked_date.year and cd.month == tracked_date.month and cd.day == tracked_date.day:
                 cell.set_state("current")
-            elif cell.date < today:
+            elif (cd.year, cd.month, cd.day) < (tracked_date.year, tracked_date.month, tracked_date.day):
                 cell.set_state("past")
             else:
                 cell.set_state("future")
@@ -286,13 +323,40 @@ class DayDetailSidebar(QWidget):
         placeholder.setWordWrap(True)
         placeholder.setStyleSheet("color: palette(mid);")
         layout.addWidget(placeholder)
+
+        # Lunar phases container
+        self._lunar_widget = QWidget()
+        self._lunar_container = QVBoxLayout(self._lunar_widget)
+        self._lunar_container.setContentsMargins(0, 4, 0, 0)
+        self._lunar_container.setSpacing(2)
+        self._lunar_widget.hide()
+        layout.addWidget(self._lunar_widget)
+
         layout.addStretch()
 
         self.hide()
 
-    def show_day(self, date: datetime.date) -> None:
+    def show_day(self, date: _CalDate) -> None:
         self._date_label.setText(_format_date(date))
         self.show()
+
+    def show_lunar_phases(self, fdt: FantasyDateTime, cal: CalendarDefinition) -> None:
+        # Clear existing widgets from the lunar container
+        while self._lunar_container.count():
+            item = self._lunar_container.takeAt(0)
+            w = item.widget()
+            if w:
+                w.hide()
+                w.setParent(None)
+                w.deleteLater()
+
+        if cal.lunar_cycles:
+            for cycle in cal.lunar_cycles:
+                label = QLabel(f"{cycle.name}: {fdt.lunar_phase(cycle)}")
+                self._lunar_container.addWidget(label)
+            self._lunar_widget.show()
+        else:
+            self._lunar_widget.hide()
 
     def hide_sidebar(self) -> None:
         self.hide()
@@ -303,13 +367,24 @@ class DayDetailSidebar(QWidget):
 # ---------------------------------------------------------------------------
 
 class CalendarTab(QWidget):
-    def __init__(self, parent=None) -> None:
+    calendar_selection_cancelled = pyqtSignal()  # emitted when user cancels the calendar selector
+    def __init__(self, calendar_def: CalendarDefinition | None = None, parent=None) -> None:
         super().__init__(parent)
 
-        self._tracked_date = datetime.datetime.combine(
-            datetime.date.today(), datetime.time(0, 0)
+        self._calendar_def = calendar_def if calendar_def is not None else GREGORIAN_DEFAULT
+        self._calendar_selection_pending = False  # True when project has no calendar chosen yet
+
+        today = datetime.date.today()
+        self._tracked_date = FantasyDateTime(
+            calendar=self._calendar_def,
+            year=today.year,
+            month=today.month,
+            day=today.day,
+            hour=0,
+            minute=0,
+            second=0,
         )
-        self._selected_date: datetime.date | None = None
+        self._selected_date: _CalDate | None = None
 
         root = QVBoxLayout(self)
         root.setContentsMargins(8, 8, 8, 8)
@@ -317,7 +392,7 @@ class CalendarTab(QWidget):
 
         # Vertical layout: CalendarView on top, DayDetailSidebar below
         self._calendar_view = CalendarView(
-            self._tracked_date.year, self._tracked_date.month
+            self._calendar_def, self._tracked_date.year, self._tracked_date.month
         )
         self._calendar_view.set_banner_text(self._format_tracked_date())
 
@@ -338,20 +413,70 @@ class CalendarTab(QWidget):
         self._calendar_view.refresh_states(self._tracked_date, self._selected_date)
 
     # ------------------------------------------------------------------
+    # Qt event overrides
+    # ------------------------------------------------------------------
+
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        if self._calendar_selection_pending:
+            self._calendar_selection_pending = False
+            QTimer.singleShot(0, self._prompt_calendar_selection)
+
+    def _prompt_calendar_selection(self) -> None:
+        from src.views.calendar_selector_dialog import CalendarSelectorDialog
+        dialog = CalendarSelectorDialog(self.window())
+        if dialog.exec() == CalendarSelectorDialog.DialogCode.Accepted:
+            calendar = dialog.get_calendar()
+            if calendar is not None:
+                self._calendar_def = calendar
+                self._calendar_view.set_calendar(calendar)
+                # Reset tracked date to today using the new calendar
+                today = datetime.date.today()
+                self._tracked_date = FantasyDateTime(
+                    calendar=self._calendar_def,
+                    year=today.year,
+                    month=today.month,
+                    day=today.day,
+                    hour=0,
+                    minute=0,
+                    second=0,
+                )
+                self._calendar_view._year = self._tracked_date.year
+                self._calendar_view._month = self._tracked_date.month
+                self._calendar_view._rebuild_grid()
+                for cell in self._calendar_view._cells:
+                    cell.clicked.connect(self._on_day_clicked)
+                self._calendar_view.set_banner_text(self._format_tracked_date())
+                self._calendar_view.show()
+                self._calendar_view.refresh_states(self._tracked_date, self._selected_date)
+        else:
+            self.calendar_selection_cancelled.emit()
+
+    # ------------------------------------------------------------------
     # Slots
     # ------------------------------------------------------------------
 
-    def _on_day_clicked(self, date: datetime.date) -> None:
+    def _on_day_clicked(self, date: _CalDate) -> None:
         if self._selected_date == date:
             self._selected_date = None
             self._sidebar.hide_sidebar()
         else:
             self._selected_date = date
             self._sidebar.show_day(date)
+            fdt = FantasyDateTime(
+                calendar=self._calendar_def,
+                year=date.year,
+                month=date.month,
+                day=date.day,
+                hour=0,
+                minute=0,
+                second=0,
+            )
+            self._sidebar.show_lunar_phases(fdt, self._calendar_def)
         self._calendar_view.refresh_states(self._tracked_date, self._selected_date)
 
     def _on_time_adjusted(self, delta_seconds: int) -> None:
-        self._tracked_date += datetime.timedelta(seconds=delta_seconds)
+        self._tracked_date = self._tracked_date.add_seconds(delta_seconds)
         self._calendar_view.set_banner_text(self._format_tracked_date())
         # If the tracked date moved to a different month, navigate the view there
         if (self._tracked_date.year != self._calendar_view.year or
@@ -377,7 +502,6 @@ class CalendarTab(QWidget):
             ):
                 self._selected_date = None
                 self._sidebar.hide_sidebar()
-
         # Re-connect clicked signals for newly created cells
         for cell in self._calendar_view._cells:
             cell.clicked.connect(self._on_day_clicked)
@@ -385,8 +509,58 @@ class CalendarTab(QWidget):
         self._calendar_view.refresh_states(self._tracked_date, self._selected_date)
 
     # ------------------------------------------------------------------
+    # Project integration
+    # ------------------------------------------------------------------
+
+    def load_from_project(self, project: Project) -> None:
+        self._calendar_def = project.calendar_definition
+        self._calendar_view.set_calendar(self._calendar_def)
+
+        # If calendar_source is empty, this is a new project — prompt on first tab visit
+        self._calendar_selection_pending = not project.calendar_source
+
+        if project.tracked_date is not None:
+            self._tracked_date = project.tracked_date
+        else:
+            today = datetime.date.today()
+            self._tracked_date = FantasyDateTime(
+                calendar=self._calendar_def,
+                year=today.year,
+                month=today.month,
+                day=today.day,
+                hour=0,
+                minute=0,
+                second=0,
+            )
+
+        self._calendar_view._year = self._tracked_date.year
+        self._calendar_view._month = self._tracked_date.month
+        self._calendar_view._rebuild_grid()
+        for cell in self._calendar_view._cells:
+            cell.clicked.connect(self._on_day_clicked)
+
+        self._calendar_view.set_banner_text(self._format_tracked_date())
+
+        if self._calendar_selection_pending:
+            self._calendar_view.hide()
+        else:
+            self._calendar_view.show()
+            self._calendar_view.refresh_states(self._tracked_date, self._selected_date)
+
+    def flush_to_project(self, project: Project) -> None:
+        project.tracked_date = self._tracked_date
+        project.calendar_definition = self._calendar_def
+        if not project.calendar_source:
+            project.calendar_source = self._calendar_def.name
+
+    # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
 
     def _format_tracked_date(self) -> str:
-        return _format_date(self._tracked_date.date()) + " — " + self._tracked_date.strftime("%H:%M")
+        fdt = self._tracked_date
+        cal = fdt.calendar
+        month_name = cal.months[fdt.month - 1].name
+        weekday_name = cal.weekday_names[fdt.day_of_week()]
+        era_str = f" {fdt.era.name}" if fdt.era is not None else ""
+        return f"{weekday_name}, {month_name} {fdt.day}, {fdt.year}{era_str} — {fdt.hour:02d}:{fdt.minute:02d}"
