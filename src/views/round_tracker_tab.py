@@ -5,6 +5,8 @@ from PyQt6.QtWidgets import (
     QWidget,
     QPushButton,
     QCheckBox,
+    QLabel,
+    QSpinBox,
     QScrollArea,
     QVBoxLayout,
     QHBoxLayout,
@@ -88,6 +90,26 @@ class TurnModePanel(QWidget):
         clear_button.clicked.connect(self._on_clear)
         sidebar.addWidget(clear_button)
 
+        # RE interval row
+        re_row = QHBoxLayout()
+        re_row.addWidget(QLabel("RE Interval:"))
+        self._re_interval_spin = QSpinBox()
+        self._re_interval_spin.setMinimum(0)
+        self._re_interval_spin.setValue(2)
+        self._re_interval_spin.valueChanged.connect(self._on_re_interval_changed)
+        re_row.addWidget(self._re_interval_spin)
+        sidebar.addLayout(re_row)
+
+        # Time per turn row
+        tpt_row = QHBoxLayout()
+        tpt_row.addWidget(QLabel("Time/Turn (min):"))
+        self._time_per_turn_spin = QSpinBox()
+        self._time_per_turn_spin.setMinimum(1)
+        self._time_per_turn_spin.setMaximum(600)
+        self._time_per_turn_spin.setValue(6)
+        tpt_row.addWidget(self._time_per_turn_spin)
+        sidebar.addLayout(tpt_row)
+
         self._integrate_checkbox = QCheckBox("Integrate with Calendar")
         self._integrate_checkbox.setChecked(True)
         sidebar.addWidget(self._integrate_checkbox)
@@ -134,6 +156,13 @@ class TurnModePanel(QWidget):
     def set_calendar_advance(self, fn: Callable[[int], None]) -> None:
         self._calendar_advance = fn
 
+    def _on_re_interval_changed(self, value: int) -> None:
+        self._re_widget.set_interval(value)
+        if value == 0:
+            self._re_widget.hide()
+        else:
+            self._re_widget.show()
+
     def _on_next_round(self) -> None:
         hit_zero = False
         for i in range(self._inner_layout.count()):
@@ -153,7 +182,7 @@ class TurnModePanel(QWidget):
             self._sound.play()
 
         if self._integrate_checkbox.isChecked() and self._calendar_advance:
-            self._calendar_advance(360)  # Next Round = 6 minutes
+            self._calendar_advance(self._time_per_turn_spin.value() * 60)
 
     def _on_add_item(self) -> None:
         dialog = AddItemDialog(self)
@@ -228,6 +257,37 @@ class TimeModePanel(QWidget):
         clear_button.clicked.connect(self._on_clear)
         sidebar.addWidget(clear_button)
 
+        # RE interval row (minutes)
+        re_row = QHBoxLayout()
+        re_row.addWidget(QLabel("RE Interval (min):"))
+        self._re_interval_spin = QSpinBox()
+        self._re_interval_spin.setMinimum(0)
+        self._re_interval_spin.setMaximum(60)
+        self._re_interval_spin.setValue(12)
+        self._re_interval_spin.valueChanged.connect(self._on_re_interval_changed)
+        re_row.addWidget(self._re_interval_spin)
+        sidebar.addLayout(re_row)
+
+        # Combat round duration (seconds)
+        combat_row = QHBoxLayout()
+        combat_row.addWidget(QLabel("Combat Round (sec):"))
+        self._combat_spin = QSpinBox()
+        self._combat_spin.setMinimum(1)
+        self._combat_spin.setMaximum(3600)
+        self._combat_spin.setValue(10)
+        combat_row.addWidget(self._combat_spin)
+        sidebar.addLayout(combat_row)
+
+        # Dungeon round duration (minutes)
+        dungeon_row = QHBoxLayout()
+        dungeon_row.addWidget(QLabel("Dungeon Round (min):"))
+        self._dungeon_spin = QSpinBox()
+        self._dungeon_spin.setMinimum(1)
+        self._dungeon_spin.setMaximum(600)
+        self._dungeon_spin.setValue(6)
+        dungeon_row.addWidget(self._dungeon_spin)
+        sidebar.addLayout(dungeon_row)
+
         self._integrate_checkbox = QCheckBox("Integrate with Calendar")
         self._integrate_checkbox.setChecked(True)
         sidebar.addWidget(self._integrate_checkbox)
@@ -274,15 +334,24 @@ class TimeModePanel(QWidget):
     def set_calendar_advance(self, fn: Callable[[int], None]) -> None:
         self._calendar_advance = fn
 
+    def _on_re_interval_changed(self, value: int) -> None:
+        self._re_widget.set_interval(value)
+        if value == 0:
+            self._re_widget.hide()
+        else:
+            self._re_widget.show()
+
     def _on_combat_round(self) -> None:
-        self._decrement_all(10)
+        seconds = self._combat_spin.value()
+        self._decrement_all(seconds)
         if self._integrate_checkbox.isChecked() and self._calendar_advance:
-            self._calendar_advance(10)  # Combat Round = 10 seconds
+            self._calendar_advance(seconds)
 
     def _on_dungeon_round(self) -> None:
-        self._decrement_all(360)
+        seconds = self._dungeon_spin.value() * 60
+        self._decrement_all(seconds)
         if self._integrate_checkbox.isChecked() and self._calendar_advance:
-            self._calendar_advance(360)  # Dungeon Round = 6 minutes
+            self._calendar_advance(seconds)
 
     def _decrement_all(self, seconds: int) -> None:
         hit_zero = False

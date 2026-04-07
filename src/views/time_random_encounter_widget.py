@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QFrame, QHBoxLayout, QLabel, QSpinBox
+from PyQt6.QtWidgets import QFrame, QHBoxLayout, QLabel
 from PyQt6.QtCore import QTimer
 
 _FLASH_MS = 80
@@ -22,18 +22,8 @@ class TimeRandomEncounterWidget(QFrame):
         self._expired = False
 
         row = QHBoxLayout(self)
-
         row.addWidget(QLabel("⚔️"))
         row.addWidget(QLabel("Random Encounter"))
-
-        row.addWidget(QLabel(" Interval (min):"))
-        self._interval_spin = QSpinBox()
-        self._interval_spin.setMinimum(0)
-        self._interval_spin.setMaximum(60)
-        self._interval_spin.setValue(self._interval_minutes)
-        self._interval_spin.valueChanged.connect(self._on_interval_changed)
-        row.addWidget(self._interval_spin)
-
         row.addStretch()
 
         self._counter_label = QLabel(self._format_counter())
@@ -42,6 +32,13 @@ class TimeRandomEncounterWidget(QFrame):
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
+
+    def set_interval(self, minutes: int) -> None:
+        """Update the interval (in minutes) and reset the counter."""
+        self._interval_minutes = minutes
+        if not self._expired:
+            self._counter = minutes * 60
+            self._counter_label.setText(self._format_counter())
 
     def decrement(self, seconds: int) -> bool:
         """Subtract *seconds* from the counter, floor at 0.
@@ -77,18 +74,6 @@ class TimeRandomEncounterWidget(QFrame):
         h, rem = divmod(self._counter, 3600)
         m, s = divmod(rem, 60)
         return f"{h:02d}:{m:02d}:{s:02d}"
-
-    def _on_interval_changed(self, value: int) -> None:
-        self._interval_minutes = value
-        if value == 0:
-            self.hide()
-        else:
-            self.show()
-            if self._expired:
-                self.reset()
-            else:
-                self._counter = value * 60
-                self._counter_label.setText(self._format_counter())
 
     def _on_expired(self) -> None:
         self._counter_label.setStyleSheet("QLabel { color: gray; }")
