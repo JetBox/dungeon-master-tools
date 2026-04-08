@@ -430,17 +430,21 @@ class CalendarTab(QWidget):
             if calendar is not None:
                 self._calendar_def = calendar
                 self._calendar_view.set_calendar(calendar)
-                # Reset tracked date to today using the new calendar
-                today = datetime.date.today()
-                self._tracked_date = FantasyDateTime(
-                    calendar=self._calendar_def,
-                    year=today.year,
-                    month=today.month,
-                    day=today.day,
-                    hour=0,
-                    minute=0,
-                    second=0,
-                )
+                # Use the wizard's initial date if provided, otherwise fall back to today
+                initial_date = dialog.get_initial_date()
+                if initial_date is not None:
+                    self._tracked_date = initial_date
+                else:
+                    today = datetime.date.today()
+                    self._tracked_date = FantasyDateTime(
+                        calendar=self._calendar_def,
+                        year=today.year,
+                        month=today.month,
+                        day=today.day,
+                        hour=0,
+                        minute=0,
+                        second=0,
+                    )
                 self._calendar_view._year = self._tracked_date.year
                 self._calendar_view._month = self._tracked_date.month
                 self._calendar_view._rebuild_grid()

@@ -11,7 +11,7 @@ from PyQt6.QtWidgets import (
 
 from src.calendar_loader import load_calendar_file
 from src.errors import ProjectLoadError
-from src.models import CalendarDefinition, MonthDefinition
+from src.models import CalendarDefinition, FantasyDateTime
 
 _GREGORIAN_JSON = os.path.normpath(
     os.path.join(os.path.dirname(__file__), "..", "..", "assets", "calendars", "gregorian.json")
@@ -25,6 +25,7 @@ class CalendarSelectorDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Choose Calendar")
         self._calendar: CalendarDefinition | None = None
+        self._initial_date: FantasyDateTime | None = None
 
         layout = QVBoxLayout(self)
 
@@ -73,15 +74,17 @@ class CalendarSelectorDialog(QDialog):
             self._error_label.show()
 
     def _on_generate_fantasy(self) -> None:
-        self._calendar = CalendarDefinition(
-            name="Fantasy Calendar",
-            months=[MonthDefinition("Month 1", 30)],
-            week_length=7,
-            weekday_names=["Day 1", "Day 2", "Day 3", "Day 4", "Day 5", "Day 6", "Day 7"],
-            hours_per_day=24,
-        )
-        self.accept()
+        from src.views.calendar_wizard_dialog import CalendarWizardDialog
+        wizard = CalendarWizardDialog(self)
+        if wizard.exec() == QDialog.DialogCode.Accepted:
+            self._calendar = wizard.get_calendar()
+            self._initial_date = wizard.get_initial_date()
+            self.accept()
 
     def get_calendar(self) -> CalendarDefinition | None:
         """Return the chosen CalendarDefinition, or None if cancelled."""
         return self._calendar
+
+    def get_initial_date(self) -> FantasyDateTime | None:
+        """Return the initial FantasyDateTime from the wizard, or None."""
+        return self._initial_date
