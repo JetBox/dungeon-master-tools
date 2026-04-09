@@ -20,14 +20,6 @@ class RandomEncounterWidget(QFrame):
         row.addWidget(QLabel("⚔️"))
         row.addWidget(QLabel("Random Encounter"))
 
-        row.addWidget(QLabel(" Interval:"))
-        self._interval_spin = QSpinBox()
-        self._interval_spin.setMinimum(0)
-        self._interval_spin.setValue(self._interval)
-        self._interval_spin.setFixedWidth(60)
-        self._interval_spin.valueChanged.connect(self._on_interval_changed)
-        row.addWidget(self._interval_spin)
-
         row.addStretch()
 
         self._spin = QSpinBox()
@@ -39,6 +31,12 @@ class RandomEncounterWidget(QFrame):
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
+
+    def set_interval(self, value: int) -> None:
+        """Update the interval and reset the counter."""
+        self._interval = value
+        if not self._expired:
+            self._spin.setValue(value)
 
     def decrement(self) -> bool:
         """Decrement by 1. Returns True if this call caused it to reach 0."""
@@ -63,17 +61,6 @@ class RandomEncounterWidget(QFrame):
     # ------------------------------------------------------------------
     # Private slots
     # ------------------------------------------------------------------
-
-    def _on_interval_changed(self, value: int) -> None:
-        self._interval = value
-        if value == 0:
-            self.hide()
-        else:
-            self.show()
-            if self._expired:
-                self.reset()
-            else:
-                self._spin.setValue(value)
 
     def _on_value_changed(self, value: int) -> None:
         if value > 0 and self._expired:

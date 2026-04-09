@@ -388,5 +388,9 @@ class CalendarTab(QWidget):
     # Helpers
     # ------------------------------------------------------------------
 
+    def advance_time(self, seconds: int) -> None:
+        """Advance (or rewind) the tracked date by the given number of seconds."""
+        self._on_time_adjusted(seconds)
+
     def _format_tracked_date(self) -> str:
         return _format_date(self._tracked_date.date()) + " — " + self._tracked_date.strftime("%H:%M")
