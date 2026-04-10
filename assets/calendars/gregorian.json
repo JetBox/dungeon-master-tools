@@ -1,0 +1,47 @@
+{
+    "name": "Gregorian",
+    "months": [
+        {"name": "January",   "day_count": 31, "leap_every_n_years": null},
+        {"name": "February",  "day_count": 28, "leap_every_n_years": 4},
+        {"name": "March",     "day_count": 31, "leap_every_n_years": null},
+        {"name": "April",     "day_count": 30, "leap_every_n_years": null},
+        {"name": "May",       "day_count": 31, "leap_every_n_years": null},
+        {"name": "June",      "day_count": 30, "leap_every_n_years": null},
+        {"name": "July",      "day_count": 31, "leap_every_n_years": null},
+        {"name": "August",    "day_count": 31, "leap_every_n_years": null},
+        {"name": "September", "day_count": 30, "leap_every_n_years": null},
+        {"name": "October",   "day_count": 31, "leap_every_n_years": null},
+        {"name": "November",  "day_count": 30, "leap_every_n_years": null},
+        {"name": "December",  "day_count": 31, "leap_every_n_years": null}
+    ],
+    "week_length": 7,
+    "weekday_names": ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+    "hours_per_day": 24,
+    "week_start_offset": 6,
+    "lunar_cycles": [],
+    "intercalary_periods": [],
+    "eras": [
+        {
+            "name": "BC",
+            "display_start": 4000,
+            "absolute_start": 1,
+            "absolute_end": 4000,
+            "direction": "descending"
+        },
+        {
+            "name": "AD",
+            "display_start": 1,
+            "absolute_start": 4001,
+            "absolute_end": 9999,
+            "direction": "ascending"
+        }
+    ],
+    "default_start_date": {
+        "year": 6026,
+        "month": 1,
+        "day": 1,
+        "hour": 0,
+        "minute": 0,
+        "second": 0
+    }
+}
