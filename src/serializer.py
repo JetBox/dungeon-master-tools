@@ -36,7 +36,13 @@ def _load_calendar_definition(data: dict) -> CalendarDefinition:
         lunar_cycles = [LunarCycle(**lc) for lc in data.get("lunar_cycles", [])]
         intercalary_periods = [IntercalaryPeriod(**ip) for ip in data.get("intercalary_periods", [])]
         eras = [
-            Era(name=e["name"], starting_year=e["starting_year"], direction=EraDirection(e["direction"]))
+            Era(
+                name=e["name"],
+                display_start=e.get("display_start", e.get("starting_year", 1)),
+                absolute_start=e.get("absolute_start", e.get("starting_year", 1)),
+                absolute_end=e.get("absolute_end", e.get("ending_year", 9999)),
+                direction=EraDirection(e["direction"]),
+            )
             for e in data.get("eras", [])
         ]
         return CalendarDefinition(
@@ -49,6 +55,7 @@ def _load_calendar_definition(data: dict) -> CalendarDefinition:
             intercalary_periods=intercalary_periods,
             eras=eras,
             week_start_offset=data.get("week_start_offset", 0),
+            default_start_date=data.get("default_start_date"),
         )
     except (KeyError, ValueError) as e:
         raise ProjectLoadError(f"Invalid calendar definition: {e}") from e
@@ -72,6 +79,7 @@ def _load_fantasy_datetime(data: dict, cal: CalendarDefinition) -> FantasyDateTi
             minute=data["minute"],
             second=data["second"],
             era=era,
+            intercalary_period_index=data.get("intercalary_period_index"),
         )
     except (KeyError, ValueError) as e:
         raise ProjectLoadError(f"Invalid tracked date: {e}") from e

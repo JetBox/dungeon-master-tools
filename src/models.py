@@ -86,8 +86,32 @@ class IntercalaryPeriod:
 @dataclass
 class Era:
     name: str
-    starting_year: int
+    display_start: int   # display year number at the start of this era (>= 1)
+    absolute_start: int  # absolute calendar year where this era begins (>= 1)
+    absolute_end: int    # absolute calendar year where this era ends (>= absolute_start)
     direction: EraDirection
+
+    def __post_init__(self):
+        if self.display_start < 1:
+            raise ValueError(f"display_start must be >= 1, got {self.display_start}")
+        if self.absolute_start < 1:
+            raise ValueError(f"absolute_start must be >= 1, got {self.absolute_start}")
+        if self.absolute_end < self.absolute_start:
+            raise ValueError(
+                f"Era '{self.name}': absolute_end ({self.absolute_end}) must be >= absolute_start ({self.absolute_start})"
+            )
+
+    def contains_year(self, year: int) -> bool:
+        """Return True if the given absolute calendar year falls within this era."""
+        return self.absolute_start <= year <= self.absolute_end
+
+    def display_year(self, year: int) -> int:
+        """Convert an absolute calendar year to the era-relative display year."""
+        offset = year - self.absolute_start  # 0-based offset from era start
+        if self.direction == EraDirection.ASCENDING:
+            return self.display_start + offset
+        else:
+            return self.display_start - offset
 
 
 @dataclass
@@ -101,6 +125,7 @@ class CalendarDefinition:
     intercalary_periods: list[IntercalaryPeriod] = field(default_factory=list)
     eras: list[Era] = field(default_factory=list)
     week_start_offset: int = 0  # shifts day_of_week so epoch day 1 maps to the correct weekday
+    default_start_date: dict | None = None  # optional {year, month, day, hour, minute, second}
 
     def __post_init__(self):
         if not (1 <= len(self.months) <= 30):
@@ -128,8 +153,7 @@ GREGORIAN_DEFAULT = CalendarDefinition(
     hours_per_day=24,
     week_start_offset=6,  # Jan 1 AD 1 was a Saturday; aligns day_of_week with real Gregorian dates
     eras=[
-        Era("BC", starting_year=1, direction=EraDirection.DESCENDING),
-        Era("AD", starting_year=1, direction=EraDirection.ASCENDING),
+        Era("AD", display_start=1, absolute_start=1, absolute_end=9999, direction=EraDirection.ASCENDING),
     ],
 )
 
@@ -144,27 +168,36 @@ PHASE_NAMES = [
 class FantasyDateTime:
     calendar: CalendarDefinition
     year: int
-    month: int
-    day: int
+    month: int  # 1-based regular month; for intercalary: the month after which the period falls (after_month + 1)
+    day: int    # 1-based day within the month or intercalary period
     hour: int
     minute: int
     second: int
     era: Era | None = None
+    intercalary_period_index: int | None = None  # index into calendar.intercalary_periods when on an intercalary day
 
     def __post_init__(self):
-        num_months = len(self.calendar.months)
-        if not (1 <= self.month <= num_months):
-            raise ValueError(f"month must be between 1 and {num_months}, got {self.month}")
-        max_day = self.calendar.months[self.month - 1].effective_day_count(self.year)
-        if not (1 <= self.day <= max_day):
-            raise ValueError(f"day must be between 1 and {max_day}, got {self.day}")
         max_hour = self.calendar.hours_per_day - 1
         if not (0 <= self.hour <= max_hour):
             raise ValueError(f"hour must be between 0 and {max_hour}, got {self.hour}")
+        if self.intercalary_period_index is not None:
+            ip = self.calendar.intercalary_periods[self.intercalary_period_index]
+            if not (1 <= self.day <= ip.day_count):
+                raise ValueError(f"day must be between 1 and {ip.day_count}, got {self.day}")
+        else:
+            num_months = len(self.calendar.months)
+            if not (1 <= self.month <= num_months):
+                raise ValueError(f"month must be between 1 and {num_months}, got {self.month}")
+            max_day = self.calendar.months[self.month - 1].effective_day_count(self.year)
+            if not (1 <= self.day <= max_day):
+                raise ValueError(f"day must be between 1 and {max_day}, got {self.day}")
+
+    @property
+    def is_intercalary(self) -> bool:
+        return self.intercalary_period_index is not None
 
     def total_elapsed_days(self) -> int:
         cal = self.calendar
-        total = 0
 
         def intercalary_days_after(month_index: int) -> int:
             return sum(
@@ -172,17 +205,28 @@ class FantasyDateTime:
                 if ip.after_month == month_index
             )
 
+        total = 0
         # Complete years before self.year
         for yr in range(1, self.year):
-            for mi, month in enumerate(cal.months):
-                total += month.effective_day_count(yr) + intercalary_days_after(mi)
+            for mi, m in enumerate(cal.months):
+                total += m.effective_day_count(yr) + intercalary_days_after(mi)
 
-        # Complete months before self.month in self.year
-        for mi in range(self.month - 1):
-            total += cal.months[mi].effective_day_count(self.year) + intercalary_days_after(mi)
-
-        # Days in current month (1-based, day 1 = 1 elapsed day)
-        total += self.day
+        if self.intercalary_period_index is not None:
+            ip = cal.intercalary_periods[self.intercalary_period_index]
+            # All months up to and including after_month, plus their intercalary days
+            for mi in range(ip.after_month + 1):
+                total += cal.months[mi].effective_day_count(self.year)
+                # Add intercalary days after this month, but stop before our own period
+                for other_ip in cal.intercalary_periods:
+                    if other_ip.after_month == mi and other_ip is not ip:
+                        total += other_ip.day_count
+            # Days into this intercalary period
+            total += self.day
+        else:
+            # Complete months before self.month in self.year
+            for mi in range(self.month - 1):
+                total += cal.months[mi].effective_day_count(self.year) + intercalary_days_after(mi)
+            total += self.day
 
         return total
 
@@ -198,67 +242,83 @@ class FantasyDateTime:
                 if ip.after_month == month_index
             )
 
-        # Flatten everything into total seconds, then re-expand
+        # Carry seconds → minutes → hours → days
         total_seconds = self.second + delta
         seconds_per_minute = 60
         minutes_per_hour = 60
-        seconds_per_hour = seconds_per_minute * minutes_per_hour
-        seconds_per_day = seconds_per_hour * cal.hours_per_day
-
-        # Carry seconds → minutes → hours → days
         total_minutes, second = divmod(total_seconds, seconds_per_minute)
         total_hours, minute = divmod(self.minute + total_minutes, minutes_per_hour)
         total_days_carry, hour = divmod(self.hour + total_hours, cal.hours_per_day)
 
-        # Now handle day carry/borrow
-        year = self.year
-        month = self.month  # 1-based
-        day = self.day      # 1-based
+        if total_days_carry == 0:
+            return FantasyDateTime(
+                calendar=cal, year=self.year, month=self.month, day=self.day,
+                hour=hour, minute=minute, second=second, era=self.era,
+                intercalary_period_index=self.intercalary_period_index,
+            )
 
-        # Convert current position to a day offset within the month, then apply carry
-        day += total_days_carry  # may be negative or > month day_count
+        # Work in "absolute day" space to avoid complex carry logic.
+        # Convert current position to an absolute day number, apply carry, then decode.
+        abs_day = self.total_elapsed_days() + total_days_carry
 
-        # Forward carry
-        while day > cal.months[month - 1].effective_day_count(year):
-            day -= cal.months[month - 1].effective_day_count(year)
-            # Add intercalary days after this month (they are skipped over)
-            # month is 1-based, so month index is month-1
-            day -= intercalary_days_after(month - 1)
-            month += 1
-            if month > len(cal.months):
-                month = 1
-                year += 1
-            # If we landed in negative territory due to intercalary skip, keep going
-            while day <= 0:
-                month -= 1
-                if month < 1:
-                    month = len(cal.months)
-                    year -= 1
-                day += cal.months[month - 1].effective_day_count(year)
-
-        # Backward borrow
-        while day <= 0:
-            month -= 1
-            if month < 1:
-                month = len(cal.months)
-                year -= 1
-            # Add intercalary days that come after this month (skipped going backwards)
-            day += intercalary_days_after(month - 1)
-            day += cal.months[month - 1].effective_day_count(year)
-
-        return FantasyDateTime(
-            calendar=cal,
-            year=year,
-            month=month,
-            day=day,
-            hour=hour,
-            minute=minute,
-            second=second,
-            era=self.era,
-        )
+        # Decode abs_day back into (year, month, day) or intercalary position
+        return _abs_day_to_fdt(cal, abs_day, hour, minute, second, self.era)
 
     def lunar_phase(self, cycle: LunarCycle) -> str:
         return PHASE_NAMES[(self.total_elapsed_days() + cycle.phase_offset) // cycle.phase_interval % 8]
+
+
+def _abs_day_to_fdt(
+    cal: CalendarDefinition,
+    abs_day: int,
+    hour: int,
+    minute: int,
+    second: int,
+    era: "Era | None",
+) -> "FantasyDateTime":
+    """Convert an absolute day number (1-based) back to a FantasyDateTime."""
+
+    def intercalary_days_after(month_index: int) -> int:
+        return sum(
+            ip.day_count for ip in cal.intercalary_periods
+            if ip.after_month == month_index
+        )
+
+    def days_in_year(yr: int) -> int:
+        total = 0
+        for mi, m in enumerate(cal.months):
+            total += m.effective_day_count(yr) + intercalary_days_after(mi)
+        return total
+
+    # Find the year
+    year = 1
+    while abs_day > days_in_year(year):
+        abs_day -= days_in_year(year)
+        year += 1
+
+    # Walk through months (and intercalary periods) within the year
+    for mi, month_def in enumerate(cal.months):
+        month_days = month_def.effective_day_count(year)
+        if abs_day <= month_days:
+            return FantasyDateTime(
+                calendar=cal, year=year, month=mi + 1, day=abs_day,
+                hour=hour, minute=minute, second=second, era=era,
+            )
+        abs_day -= month_days
+
+        # Check intercalary periods after this month
+        for ip_idx, ip in enumerate(cal.intercalary_periods):
+            if ip.after_month == mi:
+                if abs_day <= ip.day_count:
+                    return FantasyDateTime(
+                        calendar=cal, year=year, month=mi + 1, day=abs_day,
+                        hour=hour, minute=minute, second=second, era=era,
+                        intercalary_period_index=ip_idx,
+                    )
+                abs_day -= ip.day_count
+
+    # Fallback — shouldn't happen with valid input
+    raise ValueError(f"Could not decode absolute day {abs_day} for calendar {cal.name}")
 
 
 @dataclass

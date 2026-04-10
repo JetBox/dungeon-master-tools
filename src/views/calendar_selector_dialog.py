@@ -18,6 +18,25 @@ _GREGORIAN_JSON = os.path.normpath(
 )
 
 
+def _resolve_default_start_date(cal: CalendarDefinition) -> FantasyDateTime | None:
+    """Convert a calendar's default_start_date dict to a FantasyDateTime, or return None."""
+    d = cal.default_start_date
+    if d is None:
+        return None
+    try:
+        return FantasyDateTime(
+            calendar=cal,
+            year=d["year"],
+            month=d["month"],
+            day=d["day"],
+            hour=d.get("hour", 0),
+            minute=d.get("minute", 0),
+            second=d.get("second", 0),
+        )
+    except (KeyError, ValueError):
+        return None
+
+
 class CalendarSelectorDialog(QDialog):
     """Modal dialog for choosing a calendar definition for a new project."""
 
@@ -55,6 +74,7 @@ class CalendarSelectorDialog(QDialog):
     def _on_use_gregorian(self) -> None:
         try:
             self._calendar = load_calendar_file(_GREGORIAN_JSON)
+            self._initial_date = _resolve_default_start_date(self._calendar)
             self._error_label.hide()
             self.accept()
         except ProjectLoadError as e:
@@ -67,6 +87,7 @@ class CalendarSelectorDialog(QDialog):
             return
         try:
             self._calendar = load_calendar_file(path)
+            self._initial_date = _resolve_default_start_date(self._calendar)
             self._error_label.hide()
             self.accept()
         except ProjectLoadError as e:

@@ -860,8 +860,10 @@ class _LunarPage(_WizardPage):
 
 # Column indices for era table
 _ECOL_NAME = 0
-_ECOL_YEAR = 1
-_ECOL_DIR = 2
+_ECOL_DISPLAY_START = 1
+_ECOL_ABS_START = 2
+_ECOL_ABS_END = 3
+_ECOL_DIR = 4
 
 
 class _EraEditor(QWidget):
@@ -884,8 +886,8 @@ class _EraEditor(QWidget):
         layout.addWidget(QLabel("<b>Eras</b>"))
 
         # --- Table ---
-        self._table = QTableWidget(0, 3)
-        self._table.setHorizontalHeaderLabels(["Name", "Starting Year", "Direction"])
+        self._table = QTableWidget(0, 5)
+        self._table.setHorizontalHeaderLabels(["Name", "Display Start", "Abs. Start", "Abs. End", "Direction"])
         self._table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self._table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self._table.setEditTriggers(
@@ -922,19 +924,29 @@ class _EraEditor(QWidget):
     # ------------------------------------------------------------------
 
     def get_eras(self) -> list[dict]:
-        """Return list of dicts with keys: name (str), starting_year (int), direction (str)."""
+        """Return list of dicts with keys: name, display_start, absolute_start, absolute_end, direction."""
         eras = []
         for row in range(self._table.rowCount()):
             name_item = self._table.item(row, _ECOL_NAME)
-            year_spin = self._table.cellWidget(row, _ECOL_YEAR)
+            display_spin = self._table.cellWidget(row, _ECOL_DISPLAY_START)
+            abs_start_spin = self._table.cellWidget(row, _ECOL_ABS_START)
+            abs_end_spin = self._table.cellWidget(row, _ECOL_ABS_END)
             dir_combo = self._table.cellWidget(row, _ECOL_DIR)
 
             name = name_item.text() if name_item else ""
-            starting_year = year_spin.value() if year_spin else 1
+            display_start = display_spin.value() if display_spin else 1
+            absolute_start = abs_start_spin.value() if abs_start_spin else 1
+            absolute_end = abs_end_spin.value() if abs_end_spin else 9999
             direction_text = dir_combo.currentText() if dir_combo else "Ascending"
             direction = "ascending" if direction_text == "Ascending" else "descending"
 
-            eras.append({"name": name, "starting_year": starting_year, "direction": direction})
+            eras.append({
+                "name": name,
+                "display_start": display_start,
+                "absolute_start": absolute_start,
+                "absolute_end": absolute_end,
+                "direction": direction,
+            })
         return eras
 
     # ------------------------------------------------------------------
@@ -950,14 +962,32 @@ class _EraEditor(QWidget):
         name_item = QTableWidgetItem("Era 1")
         self._table.setItem(row, _ECOL_NAME, name_item)
 
-        # Starting Year — inline QSpinBox
-        year_spin = QSpinBox()
-        year_spin.setMinimum(1)
-        year_spin.setMaximum(9999)
-        year_spin.setValue(1)
-        year_spin.setFrame(False)
-        year_spin.valueChanged.connect(lambda _: self._emit_changed())
-        self._table.setCellWidget(row, _ECOL_YEAR, year_spin)
+        # Display Start — the year number shown at the start of this era
+        display_spin = QSpinBox()
+        display_spin.setMinimum(1)
+        display_spin.setMaximum(9999)
+        display_spin.setValue(1)
+        display_spin.setFrame(False)
+        display_spin.valueChanged.connect(lambda _: self._emit_changed())
+        self._table.setCellWidget(row, _ECOL_DISPLAY_START, display_spin)
+
+        # Absolute Start — the absolute calendar year where this era begins
+        abs_start_spin = QSpinBox()
+        abs_start_spin.setMinimum(1)
+        abs_start_spin.setMaximum(9999)
+        abs_start_spin.setValue(1)
+        abs_start_spin.setFrame(False)
+        abs_start_spin.valueChanged.connect(lambda _: self._emit_changed())
+        self._table.setCellWidget(row, _ECOL_ABS_START, abs_start_spin)
+
+        # Absolute End — the absolute calendar year where this era ends
+        abs_end_spin = QSpinBox()
+        abs_end_spin.setMinimum(1)
+        abs_end_spin.setMaximum(9999)
+        abs_end_spin.setValue(9999)
+        abs_end_spin.setFrame(False)
+        abs_end_spin.valueChanged.connect(lambda _: self._emit_changed())
+        self._table.setCellWidget(row, _ECOL_ABS_END, abs_end_spin)
 
         # Direction — inline QComboBox
         dir_combo = QComboBox()
@@ -1292,8 +1322,12 @@ class _ErasDateAndNamePage(_WizardPage):
         for era in self._era_editor.get_eras():
             if not era["name"].strip():
                 return "All era names must be non-empty."
-            if era["starting_year"] < 1:
-                return f"Starting year for era '{era['name']}' must be ≥ 1."
+            if era["display_start"] < 1:
+                return f"Display start for era '{era['name']}' must be ≥ 1."
+            if era["absolute_start"] < 1:
+                return f"Absolute start for era '{era['name']}' must be ≥ 1."
+            if era["absolute_end"] < era["absolute_start"]:
+                return f"Era '{era['name']}': absolute end must be ≥ absolute start."
 
         # --- Initial date: month index ---
         month_list = getattr(self, "_month_list", [])
@@ -1551,7 +1585,9 @@ class CalendarWizardDialog(QDialog):
             eras = [
                 Era(
                     name=e["name"],
-                    starting_year=e["starting_year"],
+                    display_start=e["display_start"],
+                    absolute_start=e["absolute_start"],
+                    absolute_end=e["absolute_end"],
                     direction=EraDirection(e["direction"]),
                 )
                 for e in page3["eras"]
@@ -1566,6 +1602,14 @@ class CalendarWizardDialog(QDialog):
                 lunar_cycles=lunar_cycles,
                 intercalary_periods=intercalary_periods,
                 eras=eras,
+                default_start_date={
+                    "year": page3["initial_date"]["year"],
+                    "month": page3["initial_date"]["month"],
+                    "day": page3["initial_date"]["day"],
+                    "hour": page3["initial_date"]["hour"],
+                    "minute": page3["initial_date"]["minute"],
+                    "second": page3["initial_date"]["second"],
+                },
             )
         except (ValueError, KeyError) as exc:
             QMessageBox.critical(self, "Calendar Error", f"Failed to build calendar: {exc}")
