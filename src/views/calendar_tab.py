@@ -823,6 +823,10 @@ class CalendarTab(QWidget):
     # Helpers
     # ------------------------------------------------------------------
 
+    def advance_time(self, seconds: int) -> None:
+        """Advance (or rewind) the tracked date by the given number of seconds."""
+        self._on_time_adjusted(seconds)
+
     def _format_tracked_date(self) -> str:
         fdt = self._tracked_date
         cal = fdt.calendar

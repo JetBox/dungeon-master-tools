@@ -34,6 +34,7 @@ class MainWindow(QMainWindow):
         self._calendar_tab = CalendarTab()
         self._tab_widget.addTab(self._calendar_tab, "Calendar")
         self.setCentralWidget(self._tab_widget)
+        self._round_tracker_tab.set_calendar_advance(self._calendar_tab.advance_time)
 
         self._calendar_tab.calendar_selection_cancelled.connect(
             lambda: self._tab_widget.setCurrentIndex(0)
