@@ -15,6 +15,12 @@ from src.models import (
     MonthDefinition,
     Project,
     GREGORIAN_DEFAULT,
+    RoundTrackerState,
+    RoundTrackerItem,
+    TimeTrackerItem,
+    TurnModeSettings,
+    TimeModeSettings,
+    ItemCategory,
 )
 
 REQUIRED_FIELDS = ("name", "version")
@@ -132,12 +138,54 @@ class Serializer:
             if data.get("tracked_date") is not None:
                 tracked_date = _load_fantasy_datetime(data["tracked_date"], cal)
 
+            round_tracker_state = RoundTrackerState()  # default (empty, default settings)
+            if "round_tracker_state" in data:
+                rts_data = data["round_tracker_state"]
+                turn_items = [
+                    RoundTrackerItem(
+                        name=item["name"],
+                        rounds=item["rounds"],
+                        category=ItemCategory(item["category"]),
+                    )
+                    for item in rts_data.get("turn_items", [])
+                ]
+                time_items = [
+                    TimeTrackerItem(
+                        name=item["name"],
+                        seconds=item["seconds"],
+                        category=ItemCategory(item["category"]),
+                    )
+                    for item in rts_data.get("time_items", [])
+                ]
+                ts_data = rts_data.get("turn_settings", {})
+                turn_settings = TurnModeSettings(
+                    re_interval=ts_data.get("re_interval", 2),
+                    time_per_turn=ts_data.get("time_per_turn", 6),
+                    integrate_calendar=ts_data.get("integrate_calendar", True),
+                    sound_effects=ts_data.get("sound_effects", True),
+                )
+                tms_data = rts_data.get("time_settings", {})
+                time_settings = TimeModeSettings(
+                    re_interval=tms_data.get("re_interval", 12),
+                    combat_round_seconds=tms_data.get("combat_round_seconds", 10),
+                    dungeon_round_minutes=tms_data.get("dungeon_round_minutes", 6),
+                    integrate_calendar=tms_data.get("integrate_calendar", True),
+                    sound_effects=tms_data.get("sound_effects", True),
+                )
+                round_tracker_state = RoundTrackerState(
+                    turn_items=turn_items,
+                    time_items=time_items,
+                    turn_settings=turn_settings,
+                    time_settings=time_settings,
+                )
+
             return Project(
                 name=data["name"],
                 version=data["version"],
                 calendar_definition=cal,
                 tracked_date=tracked_date,
                 calendar_source=data.get("calendar_source", ""),
+                round_tracker_state=round_tracker_state,
             )
         except ProjectLoadError:
             raise

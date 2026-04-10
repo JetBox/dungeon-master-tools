@@ -17,6 +17,7 @@ class ItemWidget(QFrame):
 
         border_color, emoji = CATEGORY_STYLE[item.category]
         self._border_color = border_color
+        self._category = item.category
         self._base_style = f"ItemWidget {{ border: 2px solid {border_color}; }}"
         self.setStyleSheet(self._base_style)
 
@@ -106,3 +107,6 @@ class ItemWidget(QFrame):
 
     def get_rounds(self) -> int:
         return self._spin.value()
+
+    def get_category(self):
+        return self._category

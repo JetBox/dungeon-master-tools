@@ -18,6 +18,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PyQt6.QtCore import QUrl
 
+from src.models import RoundTrackerItem, TimeTrackerItem, ItemCategory, RoundTrackerState, TurnModeSettings, TimeModeSettings
 from src.views.add_item_dialog import AddItemDialog
 from src.views.add_time_item_dialog import AddTimeItemDialog
 from src.views.item_widget import ItemWidget
@@ -54,6 +55,58 @@ class RoundTrackerTab(QWidget):
     def set_calendar_advance(self, fn: Callable[[int], None]) -> None:
         self._turn_panel.set_calendar_advance(fn)
         self._time_panel.set_calendar_advance(fn)
+
+    def get_state(self) -> RoundTrackerState:
+        turn = self._turn_panel.get_state()
+        time = self._time_panel.get_state()
+        return RoundTrackerState(
+            turn_items=[
+                RoundTrackerItem(name=i["name"], rounds=i["rounds"], category=ItemCategory(i["category"]))
+                for i in turn["items"]
+            ],
+            time_items=[
+                TimeTrackerItem(name=i["name"], seconds=i["seconds"], category=ItemCategory(i["category"]))
+                for i in time["items"]
+            ],
+            turn_settings=TurnModeSettings(
+                re_interval=turn["settings"]["re_interval"],
+                time_per_turn=turn["settings"]["time_per_turn"],
+                integrate_calendar=turn["settings"]["integrate_calendar"],
+                sound_effects=turn["settings"]["sound_effects"],
+            ),
+            time_settings=TimeModeSettings(
+                re_interval=time["settings"]["re_interval"],
+                combat_round_seconds=time["settings"]["combat_round_seconds"],
+                dungeon_round_minutes=time["settings"]["dungeon_round_minutes"],
+                integrate_calendar=time["settings"]["integrate_calendar"],
+                sound_effects=time["settings"]["sound_effects"],
+            ),
+        )
+
+    def load_state(self, state: RoundTrackerState) -> None:
+        self._turn_panel.load_state({
+            "items": [{"name": item.name, "rounds": item.rounds, "category": item.category.value} for item in state.turn_items],
+            "settings": {
+                "re_interval": state.turn_settings.re_interval,
+                "time_per_turn": state.turn_settings.time_per_turn,
+                "integrate_calendar": state.turn_settings.integrate_calendar,
+                "sound_effects": state.turn_settings.sound_effects,
+            },
+        })
+        self._time_panel.load_state({
+            "items": [{"name": item.name, "seconds": item.seconds, "category": item.category.value} for item in state.time_items],
+            "settings": {
+                "re_interval": state.time_settings.re_interval,
+                "combat_round_seconds": state.time_settings.combat_round_seconds,
+                "dungeon_round_minutes": state.time_settings.dungeon_round_minutes,
+                "integrate_calendar": state.time_settings.integrate_calendar,
+                "sound_effects": state.time_settings.sound_effects,
+            },
+        })
+
+    def clear(self) -> None:
+        self._turn_panel.clear()
+        self._time_panel.clear()
 
 
 class TurnModePanel(QWidget):
@@ -215,6 +268,57 @@ class TurnModePanel(QWidget):
                 self._inner_layout.removeWidget(w)
                 w.setParent(None)
                 w.deleteLater()
+        self._re_widget.reset()
+
+    def get_state(self) -> dict:
+        items = []
+        for i in range(self._inner_layout.count()):
+            w = self._inner_layout.itemAt(i).widget()
+            if isinstance(w, ItemWidget):
+                items.append({
+                    "name": w._name_edit.text(),
+                    "rounds": w.get_rounds(),
+                    "category": w.get_category().value,
+                })
+        return {
+            "items": items,
+            "settings": {
+                "re_interval": self._re_interval_spin.value(),
+                "time_per_turn": self._time_per_turn_spin.value(),
+                "integrate_calendar": self._integrate_checkbox.isChecked(),
+                "sound_effects": self._sound_checkbox.isChecked(),
+            },
+        }
+
+    def load_state(self, state: dict) -> None:
+        self.clear()
+        s = state.get("settings", {})
+        self._re_interval_spin.setValue(s.get("re_interval", 2))
+        self._time_per_turn_spin.setValue(s.get("time_per_turn", 6))
+        self._integrate_checkbox.setChecked(s.get("integrate_calendar", True))
+        self._sound_checkbox.setChecked(s.get("sound_effects", True))
+        for item_data in state.get("items", []):
+            category = ItemCategory(item_data["category"])
+            item = RoundTrackerItem(
+                name=item_data["name"],
+                rounds=item_data["rounds"],
+                category=category,
+            )
+            widget = ItemWidget(item)
+            widget.delete_requested.connect(self._on_delete_item)
+            self._inner_layout.insertWidget(self._inner_layout.count() - 2, widget)
+
+    def clear(self) -> None:
+        for i in reversed(range(self._inner_layout.count())):
+            w = self._inner_layout.itemAt(i).widget()
+            if isinstance(w, ItemWidget):
+                self._inner_layout.removeWidget(w)
+                w.setParent(None)
+                w.deleteLater()
+        self._re_interval_spin.setValue(2)
+        self._time_per_turn_spin.setValue(6)
+        self._integrate_checkbox.setChecked(True)
+        self._sound_checkbox.setChecked(True)
         self._re_widget.reset()
 
 
@@ -395,10 +499,58 @@ class TimeModePanel(QWidget):
             self._inner_layout.insertWidget(self._inner_layout.count() - 1, w)
 
     def _on_clear(self) -> None:
+        self.clear()
+
+    def get_state(self) -> dict:
+        items = []
+        for i in range(self._inner_layout.count()):
+            w = self._inner_layout.itemAt(i).widget()
+            if isinstance(w, TimeItemWidget):
+                items.append({
+                    "name": w._name_edit.text(),
+                    "seconds": w.get_seconds(),
+                    "category": w.get_category().value,
+                })
+        return {
+            "items": items,
+            "settings": {
+                "re_interval": self._re_interval_spin.value(),
+                "combat_round_seconds": self._combat_spin.value(),
+                "dungeon_round_minutes": self._dungeon_spin.value(),
+                "integrate_calendar": self._integrate_checkbox.isChecked(),
+                "sound_effects": self._sound_checkbox.isChecked(),
+            },
+        }
+
+    def load_state(self, state: dict) -> None:
+        self.clear()
+        s = state.get("settings", {})
+        self._re_interval_spin.setValue(s.get("re_interval", 12))
+        self._combat_spin.setValue(s.get("combat_round_seconds", 10))
+        self._dungeon_spin.setValue(s.get("dungeon_round_minutes", 6))
+        self._integrate_checkbox.setChecked(s.get("integrate_calendar", True))
+        self._sound_checkbox.setChecked(s.get("sound_effects", True))
+        for item_data in state.get("items", []):
+            category = ItemCategory(item_data["category"])
+            item = TimeTrackerItem(
+                name=item_data["name"],
+                seconds=item_data["seconds"],
+                category=category,
+            )
+            widget = TimeItemWidget(item)
+            widget.delete_requested.connect(self._on_delete_item)
+            self._inner_layout.insertWidget(self._inner_layout.count() - 2, widget)
+
+    def clear(self) -> None:
         for i in reversed(range(self._inner_layout.count())):
             w = self._inner_layout.itemAt(i).widget()
             if isinstance(w, TimeItemWidget):
                 self._inner_layout.removeWidget(w)
                 w.setParent(None)
                 w.deleteLater()
+        self._re_interval_spin.setValue(12)
+        self._combat_spin.setValue(10)
+        self._dungeon_spin.setValue(6)
+        self._integrate_checkbox.setChecked(True)
+        self._sound_checkbox.setChecked(True)
         self._re_widget.reset()

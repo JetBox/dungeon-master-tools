@@ -19,14 +19,16 @@ class AppController:
         window.save_project_action.triggered.connect(self.on_save_project)
         window.load_project_action.triggered.connect(self.on_load_project)
 
+        window.landing_new_project_btn.clicked.connect(self.on_new_project)
+        window.landing_load_project_btn.clicked.connect(self.on_load_project)
+
     def on_new_project(self) -> None:
         dialog = ProjectDialog(self._window)
-        if dialog.exec() != ProjectDialog.DialogCode.Accepted:
-            return
-
-        self._project = Project(name=dialog.get_name())
-        self._window.calendar_tab.load_from_project(self._project)
-        self._window.set_title(self._project.name)
+        if dialog.exec() == ProjectDialog.DialogCode.Accepted:
+            self._window.reset_tab_state()
+            self._project = Project(name=dialog.get_name())
+            self._window._calendar_tab.load_from_project(self._project)
+            self._window.show_project(self._project.name)
 
     def on_save_project(self) -> None:
         if self._project is None:
@@ -42,7 +44,8 @@ class AppController:
         if not path:
             return
 
-        self._window.calendar_tab.flush_to_project(self._project)
+        self._project.round_tracker_state = self._window._round_tracker_tab.get_state()
+        self._window._calendar_tab.flush_to_project(self._project)
 
         try:
             self._serializer.save(self._project, path)
@@ -68,6 +71,8 @@ class AppController:
             QMessageBox.critical(self._window, "Load Error", str(e))
             return
 
+        self._window.reset_tab_state()
         self._project = project
-        self._window.set_title(self._project.name)
-        self._window.calendar_tab.load_from_project(self._project)
+        self._window._calendar_tab.load_from_project(project)
+        self._window.show_project(self._project.name)
+        self._window._round_tracker_tab.load_state(project.round_tracker_state)
