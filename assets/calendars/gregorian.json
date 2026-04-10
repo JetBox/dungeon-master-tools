@@ -21,7 +21,27 @@
     "lunar_cycles": [],
     "intercalary_periods": [],
     "eras": [
-        {"name": "BC", "starting_year": 1, "direction": "descending"},
-        {"name": "AD", "starting_year": 1, "direction": "ascending"}
-    ]
+        {
+            "name": "BC",
+            "display_start": 4000,
+            "absolute_start": 1,
+            "absolute_end": 4000,
+            "direction": "descending"
+        },
+        {
+            "name": "AD",
+            "display_start": 1,
+            "absolute_start": 4001,
+            "absolute_end": 9999,
+            "direction": "ascending"
+        }
+    ],
+    "default_start_date": {
+        "year": 6026,
+        "month": 1,
+        "day": 1,
+        "hour": 0,
+        "minute": 0,
+        "second": 0
+    }
 }
