@@ -1319,7 +1319,8 @@ class _ErasDateAndNamePage(_WizardPage):
             return f"Hours per day must be between 1 and 99 (currently {hours})."
 
         # --- Eras ---
-        for era in self._era_editor.get_eras():
+        eras = self._era_editor.get_eras()
+        for era in eras:
             if not era["name"].strip():
                 return "All era names must be non-empty."
             if era["display_start"] < 1:
@@ -1328,6 +1329,17 @@ class _ErasDateAndNamePage(_WizardPage):
                 return f"Absolute start for era '{era['name']}' must be ≥ 1."
             if era["absolute_end"] < era["absolute_start"]:
                 return f"Era '{era['name']}': absolute end must be ≥ absolute start."
+
+        # Check for overlapping era ranges
+        sorted_eras = sorted(eras, key=lambda e: e["absolute_start"])
+        for i in range(len(sorted_eras) - 1):
+            a, b = sorted_eras[i], sorted_eras[i + 1]
+            if a["absolute_end"] >= b["absolute_start"]:
+                return (
+                    f"Eras '{a['name']}' (ends {a['absolute_end']}) and "
+                    f"'{b['name']}' (starts {b['absolute_start']}) overlap. "
+                    f"Each era's absolute start must be greater than the previous era's absolute end."
+                )
 
         # --- Initial date: month index ---
         month_list = getattr(self, "_month_list", [])

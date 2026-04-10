@@ -826,9 +826,13 @@ class CalendarTab(QWidget):
     def _format_tracked_date(self) -> str:
         fdt = self._tracked_date
         cal = fdt.calendar
-        # Use the era stored on the date if set; otherwise find the first matching era by year range
-        active_era = fdt.era if fdt.era is not None else next(
-            (e for e in cal.eras if e.contains_year(fdt.year)), None
+        # Always resolve era dynamically from the absolute year.
+        # Sort by absolute_start so earlier-starting eras are checked first,
+        # giving correct results even if eras are defined out of order.
+        active_era = next(
+            (e for e in sorted(cal.eras, key=lambda e: e.absolute_start)
+             if e.contains_year(fdt.year)),
+            None
         )
         if active_era is not None:
             display_yr = active_era.display_year(fdt.year)

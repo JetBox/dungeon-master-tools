@@ -153,8 +153,10 @@ GREGORIAN_DEFAULT = CalendarDefinition(
     hours_per_day=24,
     week_start_offset=6,  # Jan 1 AD 1 was a Saturday; aligns day_of_week with real Gregorian dates
     eras=[
-        Era("AD", display_start=1, absolute_start=1, absolute_end=9999, direction=EraDirection.ASCENDING),
+        Era("BC", display_start=4000, absolute_start=1, absolute_end=4000, direction=EraDirection.DESCENDING),
+        Era("AD", display_start=1, absolute_start=4001, absolute_end=9999, direction=EraDirection.ASCENDING),
     ],
+    default_start_date={"year": 6026, "month": 1, "day": 1, "hour": 0, "minute": 0, "second": 0},
 )
 
 
