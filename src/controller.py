@@ -21,9 +21,12 @@ class AppController:
 
     def on_new_project(self) -> None:
         dialog = ProjectDialog(self._window)
-        if dialog.exec() == ProjectDialog.DialogCode.Accepted:
-            self._project = Project(name=dialog.get_name())
-            self._window.set_title(self._project.name)
+        if dialog.exec() != ProjectDialog.DialogCode.Accepted:
+            return
+
+        self._project = Project(name=dialog.get_name())
+        self._window.calendar_tab.load_from_project(self._project)
+        self._window.set_title(self._project.name)
 
     def on_save_project(self) -> None:
         if self._project is None:
@@ -38,6 +41,8 @@ class AppController:
         )
         if not path:
             return
+
+        self._window.calendar_tab.flush_to_project(self._project)
 
         try:
             self._serializer.save(self._project, path)
@@ -65,3 +70,4 @@ class AppController:
 
         self._project = project
         self._window.set_title(self._project.name)
+        self._window.calendar_tab.load_from_project(self._project)
