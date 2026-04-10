@@ -2,6 +2,7 @@ from PyQt6.QtWidgets import QMainWindow, QMenuBar, QMenu, QTabWidget, QWidget
 from PyQt6.QtGui import QAction
 from src.views.round_tracker_tab import RoundTrackerTab
 from src.views.calendar_tab import CalendarTab
+from src.views.random_tables_tab import RandomTablesTab
 
 
 class MainWindow(QMainWindow):
@@ -33,6 +34,8 @@ class MainWindow(QMainWindow):
         self._tab_widget.addTab(self._round_tracker_tab, "Round Tracker")
         self._calendar_tab = CalendarTab()
         self._tab_widget.addTab(self._calendar_tab, "Calendar")
+        self._random_tables_tab = RandomTablesTab()
+        self._tab_widget.addTab(self._random_tables_tab, "Random Tables")
         self.setCentralWidget(self._tab_widget)
 
     def set_title(self, project_name: str) -> None:
