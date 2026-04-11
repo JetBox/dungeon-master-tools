@@ -3,7 +3,7 @@ from PyQt6.QtWidgets import (
     QStackedWidget, QVBoxLayout, QLabel, QPushButton,
 )
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QAction
+from PyQt6.QtGui import QAction, QKeySequence
 from src.views.round_tracker_tab import RoundTrackerTab
 from src.views.calendar_tab import CalendarTab
 
@@ -24,6 +24,7 @@ class MainWindow(QMainWindow):
 
         self.new_project_action = QAction("New Project", self)
         self.save_project_action = QAction("Save Project", self)
+        self.save_project_action.setShortcut(QKeySequence.StandardKey.Save)
         self.load_project_action = QAction("Load Project", self)
 
         file_menu.addAction(self.new_project_action)
