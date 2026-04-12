@@ -6,6 +6,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QAction, QKeySequence
 from src.views.round_tracker_tab import RoundTrackerTab
 from src.views.calendar_tab import CalendarTab
+from src.views.random_tables_tab import RandomTablesTab
 
 
 class MainWindow(QMainWindow):
@@ -38,6 +39,9 @@ class MainWindow(QMainWindow):
         self._tab_widget.addTab(self._round_tracker_tab, "Round Tracker")
         self._calendar_tab = CalendarTab()
         self._tab_widget.addTab(self._calendar_tab, "Calendar")
+        self._random_tables_tab = RandomTablesTab()
+        self._tab_widget.addTab(self._random_tables_tab, "Random Tables")
+        self.setCentralWidget(self._tab_widget)
         self._round_tracker_tab.set_calendar_advance(self._calendar_tab.advance_time)
 
         self._calendar_tab.calendar_selection_cancelled.connect(
