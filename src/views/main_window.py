@@ -26,10 +26,13 @@ class MainWindow(QMainWindow):
         self.new_project_action = QAction("New Project", self)
         self.save_project_action = QAction("Save Project", self)
         self.save_project_action.setShortcut(QKeySequence.StandardKey.Save)
+        self.save_as_project_action = QAction("Save As...", self)
+        self.save_as_project_action.setShortcut(QKeySequence("Ctrl+Shift+S"))
         self.load_project_action = QAction("Load Project", self)
 
         file_menu.addAction(self.new_project_action)
         file_menu.addAction(self.save_project_action)
+        file_menu.addAction(self.save_as_project_action)
         file_menu.addAction(self.load_project_action)
 
         # Central tab widget
@@ -93,6 +96,7 @@ class MainWindow(QMainWindow):
     def reset_tab_state(self) -> None:
         """Clear transient tab state ready for a fresh project load."""
         self._round_tracker_tab.clear()
+        self._random_tables_tab.load_tables([])
         self._tab_widget.setCurrentIndex(0)
         if hasattr(self._calendar_tab, "reset"):
             self._calendar_tab.reset()

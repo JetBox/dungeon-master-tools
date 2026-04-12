@@ -40,6 +40,19 @@ class TimeRandomEncounterWidget(QFrame):
             self._counter = minutes * 60
             self._counter_label.setText(self._format_counter())
 
+    def get_current_seconds(self) -> int:
+        """Return the current countdown value in seconds."""
+        return self._counter
+
+    def restore(self, interval_minutes: int, current_seconds: int) -> None:
+        """Restore saved state without triggering a full reset."""
+        self._interval_minutes = interval_minutes
+        self._counter = current_seconds
+        self._expired = False
+        self._counter_label.setStyleSheet("")
+        self._counter_label.setText(self._format_counter())
+        self.setStyleSheet(self._base_style)
+
     def decrement(self, seconds: int) -> bool:
         """Subtract *seconds* from the counter, floor at 0.
 

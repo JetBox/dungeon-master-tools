@@ -38,6 +38,7 @@ class TimeTrackerItem:
 @dataclass
 class TurnModeSettings:
     re_interval: int = 2
+    re_current: int = 2
     time_per_turn: int = 6
     integrate_calendar: bool = True
     sound_effects: bool = True
@@ -46,6 +47,7 @@ class TurnModeSettings:
 @dataclass
 class TimeModeSettings:
     re_interval: int = 12
+    re_current_seconds: int = 720  # 12 * 60
     combat_round_seconds: int = 10
     dungeon_round_minutes: int = 6
     integrate_calendar: bool = True
@@ -374,3 +376,4 @@ class Project:
     calendar_days: list[CalendarDay] = field(default_factory=list)
     calendar_source: str = ""
     round_tracker_state: RoundTrackerState = field(default_factory=RoundTrackerState)
+    random_tables: list[RandomTable] = field(default_factory=list)

@@ -70,12 +70,14 @@ class RoundTrackerTab(QWidget):
             ],
             turn_settings=TurnModeSettings(
                 re_interval=turn["settings"]["re_interval"],
+                re_current=turn["settings"]["re_current"],
                 time_per_turn=turn["settings"]["time_per_turn"],
                 integrate_calendar=turn["settings"]["integrate_calendar"],
                 sound_effects=turn["settings"]["sound_effects"],
             ),
             time_settings=TimeModeSettings(
                 re_interval=time["settings"]["re_interval"],
+                re_current_seconds=time["settings"]["re_current_seconds"],
                 combat_round_seconds=time["settings"]["combat_round_seconds"],
                 dungeon_round_minutes=time["settings"]["dungeon_round_minutes"],
                 integrate_calendar=time["settings"]["integrate_calendar"],
@@ -88,6 +90,7 @@ class RoundTrackerTab(QWidget):
             "items": [{"name": item.name, "rounds": item.rounds, "category": item.category.value} for item in state.turn_items],
             "settings": {
                 "re_interval": state.turn_settings.re_interval,
+                "re_current": state.turn_settings.re_current,
                 "time_per_turn": state.turn_settings.time_per_turn,
                 "integrate_calendar": state.turn_settings.integrate_calendar,
                 "sound_effects": state.turn_settings.sound_effects,
@@ -97,6 +100,7 @@ class RoundTrackerTab(QWidget):
             "items": [{"name": item.name, "seconds": item.seconds, "category": item.category.value} for item in state.time_items],
             "settings": {
                 "re_interval": state.time_settings.re_interval,
+                "re_current_seconds": state.time_settings.re_current_seconds,
                 "combat_round_seconds": state.time_settings.combat_round_seconds,
                 "dungeon_round_minutes": state.time_settings.dungeon_round_minutes,
                 "integrate_calendar": state.time_settings.integrate_calendar,
@@ -284,6 +288,7 @@ class TurnModePanel(QWidget):
             "items": items,
             "settings": {
                 "re_interval": self._re_interval_spin.value(),
+                "re_current": self._re_widget.get_current_value(),
                 "time_per_turn": self._time_per_turn_spin.value(),
                 "integrate_calendar": self._integrate_checkbox.isChecked(),
                 "sound_effects": self._sound_checkbox.isChecked(),
@@ -293,7 +298,14 @@ class TurnModePanel(QWidget):
     def load_state(self, state: dict) -> None:
         self.clear()
         s = state.get("settings", {})
-        self._re_interval_spin.setValue(s.get("re_interval", 2))
+        interval = s.get("re_interval", 2)
+        current = s.get("re_current", interval)
+        self._re_interval_spin.setValue(interval)
+        self._re_widget.restore(interval, current)
+        if interval == 0:
+            self._re_widget.hide()
+        else:
+            self._re_widget.show()
         self._time_per_turn_spin.setValue(s.get("time_per_turn", 6))
         self._integrate_checkbox.setChecked(s.get("integrate_calendar", True))
         self._sound_checkbox.setChecked(s.get("sound_effects", True))
@@ -515,6 +527,7 @@ class TimeModePanel(QWidget):
             "items": items,
             "settings": {
                 "re_interval": self._re_interval_spin.value(),
+                "re_current_seconds": self._re_widget.get_current_seconds(),
                 "combat_round_seconds": self._combat_spin.value(),
                 "dungeon_round_minutes": self._dungeon_spin.value(),
                 "integrate_calendar": self._integrate_checkbox.isChecked(),
@@ -525,7 +538,14 @@ class TimeModePanel(QWidget):
     def load_state(self, state: dict) -> None:
         self.clear()
         s = state.get("settings", {})
-        self._re_interval_spin.setValue(s.get("re_interval", 12))
+        interval = s.get("re_interval", 12)
+        current_seconds = s.get("re_current_seconds", interval * 60)
+        self._re_interval_spin.setValue(interval)
+        self._re_widget.restore(interval, current_seconds)
+        if interval == 0:
+            self._re_widget.hide()
+        else:
+            self._re_widget.show()
         self._combat_spin.setValue(s.get("combat_round_seconds", 10))
         self._dungeon_spin.setValue(s.get("dungeon_round_minutes", 6))
         self._integrate_checkbox.setChecked(s.get("integrate_calendar", True))

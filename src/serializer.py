@@ -15,8 +15,10 @@ from src.models import (
     MonthDefinition,
     Project,
     GREGORIAN_DEFAULT,
+    RandomTable,
     RoundTrackerState,
     RoundTrackerItem,
+    TableEntry,
     TimeTrackerItem,
     TurnModeSettings,
     TimeModeSettings,
@@ -160,6 +162,7 @@ class Serializer:
                 ts_data = rts_data.get("turn_settings", {})
                 turn_settings = TurnModeSettings(
                     re_interval=ts_data.get("re_interval", 2),
+                    re_current=ts_data.get("re_current", ts_data.get("re_interval", 2)),
                     time_per_turn=ts_data.get("time_per_turn", 6),
                     integrate_calendar=ts_data.get("integrate_calendar", True),
                     sound_effects=ts_data.get("sound_effects", True),
@@ -167,6 +170,7 @@ class Serializer:
                 tms_data = rts_data.get("time_settings", {})
                 time_settings = TimeModeSettings(
                     re_interval=tms_data.get("re_interval", 12),
+                    re_current_seconds=tms_data.get("re_current_seconds", tms_data.get("re_interval", 12) * 60),
                     combat_round_seconds=tms_data.get("combat_round_seconds", 10),
                     dungeon_round_minutes=tms_data.get("dungeon_round_minutes", 6),
                     integrate_calendar=tms_data.get("integrate_calendar", True),
@@ -179,6 +183,14 @@ class Serializer:
                     time_settings=time_settings,
                 )
 
+            random_tables = [
+                RandomTable(
+                    name=t["name"],
+                    entries=[TableEntry(name=e["name"], weight=e["weight"]) for e in t.get("entries", [])],
+                )
+                for t in data.get("random_tables", [])
+            ]
+
             return Project(
                 name=data["name"],
                 version=data["version"],
@@ -186,6 +198,7 @@ class Serializer:
                 tracked_date=tracked_date,
                 calendar_source=data.get("calendar_source", ""),
                 round_tracker_state=round_tracker_state,
+                random_tables=random_tables,
             )
         except ProjectLoadError:
             raise
