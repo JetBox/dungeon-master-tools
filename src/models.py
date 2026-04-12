@@ -36,6 +36,33 @@ class TimeTrackerItem:
 
 
 @dataclass
+class TurnModeSettings:
+    re_interval: int = 2
+    re_current: int = 2
+    time_per_turn: int = 6
+    integrate_calendar: bool = True
+    sound_effects: bool = True
+
+
+@dataclass
+class TimeModeSettings:
+    re_interval: int = 12
+    re_current_seconds: int = 720  # 12 * 60
+    combat_round_seconds: int = 10
+    dungeon_round_minutes: int = 6
+    integrate_calendar: bool = True
+    sound_effects: bool = True
+
+
+@dataclass
+class RoundTrackerState:
+    turn_items: list[RoundTrackerItem] = field(default_factory=list)
+    time_items: list[TimeTrackerItem] = field(default_factory=list)
+    turn_settings: TurnModeSettings = field(default_factory=TurnModeSettings)
+    time_settings: TimeModeSettings = field(default_factory=TimeModeSettings)
+
+
+@dataclass
 class CalendarDay:
     date: datetime.date
 
@@ -348,3 +375,5 @@ class Project:
     tracked_date: FantasyDateTime | None = None
     calendar_days: list[CalendarDay] = field(default_factory=list)
     calendar_source: str = ""
+    round_tracker_state: RoundTrackerState = field(default_factory=RoundTrackerState)
+    random_tables: list[RandomTable] = field(default_factory=list)

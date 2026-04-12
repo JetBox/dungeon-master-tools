@@ -38,6 +38,18 @@ class RandomEncounterWidget(QFrame):
         if not self._expired:
             self._spin.setValue(value)
 
+    def get_current_value(self) -> int:
+        """Return the current countdown value shown in the spinbox."""
+        return self._spin.value()
+
+    def restore(self, interval: int, current: int) -> None:
+        """Restore saved state without triggering a full reset."""
+        self._interval = interval
+        self._expired = False
+        self._spin.setStyleSheet("")
+        self.setStyleSheet(self._base_style)
+        self._spin.setValue(current)
+
     def decrement(self) -> bool:
         """Decrement by 1. Returns True if this call caused it to reach 0."""
         if self._expired or self._interval == 0:

@@ -635,3 +635,27 @@ class RandomTablesTab(QWidget):
 
     def _on_edit_mode_changed(self, active: bool) -> None:
         self._content_area.set_roll_enabled(not active)
+
+    # ------------------------------------------------------------------
+    # Save / Load
+    # ------------------------------------------------------------------
+
+    def get_tables(self) -> list[RandomTable]:
+        """Return the current list of tables (for saving)."""
+        return list(self._tables)
+
+    def load_tables(self, tables: list[RandomTable]) -> None:
+        """Clear current state and populate from a list of RandomTable objects."""
+        # Clear sidebar
+        for item in list(self._sidebar._items):
+            self._sidebar._list_layout.removeWidget(item)
+            item.deleteLater()
+        self._sidebar._items.clear()
+
+        self._content_area.clear()
+        self._tables.clear()
+        self._selected_table = None
+
+        for table in tables:
+            self._tables.append(table)
+            self._sidebar.add_table(table)

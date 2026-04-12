@@ -329,7 +329,7 @@ class CalendarView(QWidget):
         # Clamp month to valid range in case of stale state after calendar switch
         self._month = max(1, min(self._month, len(self._calendar_def.months)))
         month_def = self._calendar_def.months[self._month - 1]
-        self._month_label.setText(month_def.name + " " + str(self._year))
+        self._month_label.setText(month_def.name + " " + self._display_year_str(self._year))
 
         week_length = self._calendar_def.week_length
         for col, name in enumerate(self._calendar_def.weekday_names):
@@ -360,7 +360,7 @@ class CalendarView(QWidget):
 
     def _rebuild_grid_intercalary(self) -> None:
         ip = self._intercalary_period
-        self._month_label.setText(f"{ip.name} {self._year}")
+        self._month_label.setText(f"{ip.name} {self._display_year_str(self._year)}")
 
         week_length = self._calendar_def.week_length
         # No weekday headers for intercalary periods — just lay days out left-to-right
@@ -372,6 +372,17 @@ class CalendarView(QWidget):
             cell = DayCell(date)
             self._cells.append(cell)
             self._grid.addWidget(cell, row, col)
+
+    def _display_year_str(self, year: int) -> str:
+        """Return the era-relative display year string, e.g. '2025 AD' or '44 BC'."""
+        active_era = next(
+            (e for e in sorted(self._calendar_def.eras, key=lambda e: e.absolute_start)
+             if e.contains_year(year)),
+            None,
+        )
+        if active_era is not None:
+            return f"{active_era.display_year(year)} {active_era.name}"
+        return str(year)
 
     def set_calendar(self, cal: CalendarDefinition) -> None:
         self._calendar_def = cal

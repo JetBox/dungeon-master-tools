@@ -26,6 +26,7 @@ class TimeItemWidget(QFrame):
         self._base_style = f"TimeItemWidget {{ border: 2px solid {border_color}; }}"
         self.setStyleSheet(self._base_style)
 
+        self._category = item.category
         self._last_valid_name = item.name
         self._paused = False
         self._expired = False
@@ -120,6 +121,10 @@ class TimeItemWidget(QFrame):
     def get_seconds(self) -> int:
         """Return current remaining seconds (for sorting)."""
         return self._spin.value()
+
+    def get_category(self):
+        """Return the ItemCategory for this widget."""
+        return self._category
 
     def is_paused(self) -> bool:
         return self._paused
