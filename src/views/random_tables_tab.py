@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QMessageBox,
     QPushButton,
     QScrollArea,
     QSizePolicy,
@@ -270,6 +271,7 @@ class EntryWidget(QFrame):
 class TableListItem(QFrame):
     selected = pyqtSignal(object)           # RandomTable
     name_changed = pyqtSignal(object, str)  # RandomTable, new_name
+    delete_requested = pyqtSignal(object)   # RandomTable
 
     _BASE_STYLE = "TableListItem { border: 1px solid transparent; padding: 2px; }"
     _SELECTED_STYLE = "TableListItem { border: 1px solid #555; background-color: #d0e8ff; padding: 2px; }"
@@ -290,6 +292,12 @@ class TableListItem(QFrame):
         self._edit_btn.setFixedSize(40, 24)
         self._edit_btn.clicked.connect(self._on_edit_clicked)
         self._row.addWidget(self._edit_btn)
+
+        self._delete_btn = QPushButton("X")
+        self._delete_btn.setFixedSize(24, 24)
+        self._delete_btn.setStyleSheet("color: #c0392b; font-weight: bold;")
+        self._delete_btn.clicked.connect(lambda: self.delete_requested.emit(self._table))
+        self._row.addWidget(self._delete_btn)
 
         # edit-mode widget (hidden initially)
         self._name_edit = QLineEdit()
@@ -314,6 +322,7 @@ class TableListItem(QFrame):
     def _on_edit_clicked(self) -> None:
         self._name_edit.setText(self._table.name)
         self._name_label.hide()
+        self._delete_btn.hide()
         self._edit_btn.hide()
         self._name_edit.show()
         self._name_edit.setFocus()
@@ -327,12 +336,14 @@ class TableListItem(QFrame):
             # revert
             self._name_edit.hide()
             self._name_label.show()
+            self._delete_btn.show()
             self._edit_btn.show()
             return
         self._table.name = new_name
         self._name_label.setText(new_name)
         self._name_edit.hide()
         self._name_label.show()
+        self._delete_btn.show()
         self._edit_btn.show()
         self.name_changed.emit(self._table, new_name)
 
@@ -343,6 +354,7 @@ class TableListItem(QFrame):
 
 class TableListSidebar(QWidget):
     table_selected = pyqtSignal(object)  # RandomTable
+    delete_requested = pyqtSignal(object)  # RandomTable
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -387,6 +399,7 @@ class TableListSidebar(QWidget):
         item = TableListItem(table)
         item.selected.connect(self.select_table)
         item.name_changed.connect(lambda t, n: None)  # parent can connect further
+        item.delete_requested.connect(self.delete_requested.emit)
         # insert before the trailing spacer
         idx = self._list_layout.count() - 1
         self._list_layout.insertWidget(idx, item)
@@ -528,6 +541,7 @@ class RandomTablesTab(QWidget):
         self._sidebar = TableListSidebar()
         self._sidebar.setFixedWidth(200)
         self._sidebar.table_selected.connect(self._on_table_selected)
+        self._sidebar.delete_requested.connect(self._on_delete_table)
         self._sidebar.set_add_callback(self._on_add_table)
         layout.addWidget(self._sidebar)
 
@@ -548,6 +562,27 @@ class RandomTablesTab(QWidget):
         table = RandomTable(name=dialog.get_name())
         self._tables.append(table)
         self._sidebar.add_table(table)
+
+    def _on_delete_table(self, table: RandomTable) -> None:
+        reply = QMessageBox.question(
+            self,
+            "Delete Table",
+            f"Delete table \"{table.name}\"?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        if self._selected_table is table:
+            self._selected_table = None
+            self._content_area.clear()
+        # Remove from sidebar
+        for item in list(self._sidebar._items):
+            if item._table is table:
+                self._sidebar._items.remove(item)
+                self._sidebar._list_layout.removeWidget(item)
+                item.deleteLater()
+                break
+        self._tables.remove(table)
 
     def _on_table_selected(self, table: RandomTable) -> None:
         self._selected_table = table

@@ -40,7 +40,6 @@ class CalendarDay:
     date: datetime.date
 
 
-<<<<<<< HEAD
 @dataclass
 class TableEntry:
     name: str
@@ -51,7 +50,6 @@ class TableEntry:
 class RandomTable:
     name: str
     entries: list[TableEntry] = field(default_factory=list)
-=======
 # --- Custom Calendar Models ---
 
 class EraDirection(Enum):
@@ -350,4 +348,3 @@ class Project:
     tracked_date: FantasyDateTime | None = None
     calendar_days: list[CalendarDay] = field(default_factory=list)
     calendar_source: str = ""
->>>>>>> main
