@@ -40,6 +40,16 @@ class CalendarDay:
     date: datetime.date
 
 
+@dataclass
+class TableEntry:
+    name: str
+    weight: int  # >= 1
+
+
+@dataclass
+class RandomTable:
+    name: str
+    entries: list[TableEntry] = field(default_factory=list)
 # --- Custom Calendar Models ---
 
 class EraDirection(Enum):
